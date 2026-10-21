@@ -225,9 +225,26 @@ accepted fences are rejected as ambiguous; unfenced JSON is not accepted.
 
 ## 3. Establish trust and actual execution
 
-Project configuration must be trusted, and each non-managed hook definition must
-be reviewed/trusted through the client's supported surface. In CLI, use `/hooks`
-to inspect the exact source, matcher, command and timeout before trusting it.
+Establish trust in this order:
+
+1. **Confirm project trust before requesting hook approval.** Inspect the selected
+   client's resolved project root and configuration-layer diagnostics. An untrusted
+   project can have its entire project configuration layer disabled, including
+   `.codex/hooks.json`; its hooks may therefore be absent from the approval list.
+   Installed files and a visible project folder do not prove discovery. If the
+   layer is disabled for lack of trust, request the necessary project-scoped trust
+   action through the client's supported flow, then reload and verify discovery.
+2. **Review the discovered hook definitions.** Confirm the exact project source,
+   matcher, command and timeout before trusting each non-managed hook. In CLI,
+   use `/hooks`; in the App or VS Code, use the native hook-review surface.
+3. **Verify invocation in that client.** Confirm an actual hook event and the
+   expected tool result using the disposable qualification cases below.
+
+If hooks are missing, check the project layer's disabled reason before asking the
+user to approve them again. Project trust and hook trust are separate prerequisites;
+neither proves execution. Preserve model, authentication and tool permissions,
+and do not broaden trust to a parent directory to make project hooks appear.
+
 Check the App and VS Code surfaces independently; do not infer their state from a CLI run or
 its bundled executable. Request a fresh chat or restart only when needed to load
 the configuration, and record the exact user intervention.
