@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vibe Setup"
+  short_description: "Set up, validate, and review Vibe for an existing project"
+  default_prompt: "Use $vibe-setup to complete Vibe setup in this project, validate it in my Codex clients, and obtain independent review."

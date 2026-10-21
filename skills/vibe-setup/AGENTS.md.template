@@ -1,0 +1,56 @@
+# Project guide
+
+Replace the bracketed project inputs before use. Preserve existing useful local
+instructions and nested guides; do not replace the whole file mechanically.
+
+## Context and constraints
+
+- Repository root and application roots: [exact relative paths].
+- Active harness root owning the executing hook: [exact root; may differ from the software repository].
+- Product, architecture and design authority: [existing canonical documents].
+- Safety, data, accessibility and authorization constraints: [project-specific].
+- Documentation home and ownership: [existing canonical destinations].
+- Install, develop, lint, types, tests and build: [verified commands and runtimes].
+- Publication policy: [explicit user/project authority; no assumed deployment].
+
+## Working procedure
+
+Read active instructions, relevant code and contracts before editing. Preserve
+existing work. Define acceptance checks, make the smallest complete change, run
+relevant checks and independently review nontrivial changes. State assumptions,
+unrun checks and limitations. Distinguish source, fixtures and deployment evidence.
+Keep durable facts with source, verification date and invalidation triggers; keep
+temporary handoffs in the existing task record. Resume by checking actual state.
+
+Use installed relevant skills and supported native tools. Preserve the main model,
+provider, authentication and permissions. Choose supported subagent capability by
+task complexity and risk under the user's policy, or inherit session settings.
+Do not add a provider, proxy or paid API to enable delegation.
+
+Use native subagents when independent work, specialization or context isolation
+justifies coordination. Before spawning, write the bounded JSON declaration from
+[the delegation contract](.codex/delegation-brief.md) to
+the active harness root's `.codex-delegations/<task_name>.json`. Name that root and
+the software repository separately in the native message; use that exact task name
+and one explicit safe harness-root-relative declaration pointer. State command
+directories and read/write path bases in the existing context/instructions fields.
+Do not reinterpret the pointer using a nearer Git root after changing directories.
+Require the child to read it and compare the assigned scope. Compare trusted native
+identity when available; otherwise report binding unverified without inventing
+identity or blocking solely because host identity is unavailable.
+Assign disjoint writable files/resources; serialize dependencies and shared
+resources. Reviewers work read-only. Confirm a previous worker has stopped before
+taking over its files. The coordinator verifies diffs/evidence and owns integration.
+
+Return exactly one standalone JSON report fence tagged `delegation-report` or
+`json`, using the contract's exact schema. Multiple accepted fences are ambiguous;
+unfenced JSON is not accepted.
+
+Trusted hooks reject structurally invalid intercepted dispatches and request one
+missing-report correction. They do not sandbox workers, verify report truth or
+prove ownership. Verify actual invocation on each supported client after changes.
+
+Continue authorized work after status questions and around independent blockers.
+Respect pauses, cancellations and finite budgets. Do not claim background work
+without an active process. Use the user's publication policy after checks, review
+and semantic documentation review; installation grants no deployment authority.
