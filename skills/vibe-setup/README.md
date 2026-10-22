@@ -13,13 +13,13 @@ records in each consuming project's own documentation. The installed skill is
 self-contained and does not depend on a consuming project's checkout or policies.
 
 The source package also provides [task worktree inspection and startup](task-lifecycle.md)
-and Phase 2 [recoverable recipe setup](onboarding.md) through `workflow.py`.
-Invoke it explicitly from the complete reviewed package. It previews compatible
+and [recoverable recipe setup](onboarding.md) through `workflow.py`.
+The skill invokes it from the complete installed package. It previews compatible
 changes, applies the guard recipe and lifecycle policy in a verified worktree,
-and resumes interrupted writes without overwriting foreign edits. Phase 3 adds PR automation
-and ordered cleanup with a separate opt-out. Automatic client integration remains
-Phase 4. The existing installer
-API/CLI still installs only the subagent component.
+and resumes interrupted writes without overwriting foreign edits. It also provides
+PR automation and ordered cleanup with a separate opt-out. Onboarding adds direct
+helper instructions to the existing project guide for normal tasks. The component
+installer API/CLI still installs only the subagent guard.
 
 Source baseline: [Vibe Prompt 12 at `790a895`](https://github.com/soumatheusgomes/vibe-coding-toolkit/blob/790a895304e0c08b70a5b215c9d334f1c86b816c/docs/prompts/12-existing-project-setup.md).
 Use that complete prompt for the surrounding setup, not only this subagent package.
@@ -125,7 +125,8 @@ semantics; a previous project's risk acceptance does not bind a new project.
 Record the actual Git root, nested app roots, stacks, runtimes, package managers,
 canonical documentation, acceptance commands, user constraints and publication
 policy. Inspect dirty/staged files, active instruction overrides and existing local
-skills/configuration. Choose an isolated checkout when shared edits require it.
+skills/configuration. Follow the [lifecycle startup contract](task-lifecycle.md): verify an isolated
+worktree before implementation unless explicitly opted out.
 Map all nine Prompt 12 document purposes to existing destinations; do not create
 competing documentation or claim non-UI/Claude validations that do not apply.
 
@@ -269,6 +270,39 @@ Trust applies to definitions, while scripts are separate files: review script
 changes too. Matching sources accumulate; inspect the full active list for duplicate
 RTK or subagent handlers. If a command, matcher or source changes, recheck trust.
 Confirm actual loading after changes rather than relying on an existing chat.
+
+### Worktree and delivery qualification
+
+For the integrated helper, exercise each selected client through its actual native
+agent/tool surface. A CLI-only subprocess cannot qualify the App or VS Code.
+Record client version, installed skill source/hash, active model/permissions,
+command/worker roots, the exact native invocation and preserved-setting hashes.
+A worker session proves its own execution surface; it does not prove a standalone
+project window loaded local hooks. Record that distinction explicitly.
+
+Use the [onboarding decision cases](tests/fixtures/onboarding-scenarios.json) for
+working/fresh projects, missing prerequisites, account ambiguity, absent hooks,
+independent opt-outs across upgrade, interrupted setup and manual delivery. Judge
+actions and necessary questions; do not accept a checklist repeated without the
+correct worktree, preservation and recovery decisions.
+
+In a disposable repository, verify skill discovery/read, helper `inspect`/`start`,
+actual commands and workers using the verified root, setup preview/apply/resume,
+and a no-change rerun. Exercise one planned synchronization, controlled publication
+failure and manual recovery. Qualify cleanup opt-out, complete merged-PR inventory,
+remote-first removal and interrupted recovery from outside the target. Use local
+bare remotes and deterministic GitHub responses for destructive failure cases;
+label that evidence as transport fixtures, not real GitHub publication. A real
+phase PR can separately establish live publication evidence. Never create or merge
+extra PRs solely to make a test look live without authorization.
+
+Do not change a client's selected model, provider, account, approval mode or tool
+permissions for qualification. Preserve hooks/trust already approved; request only
+missing project-scoped actions after preparing the exact reviewed fixture. If an
+actual client or trust surface is unavailable, name that pending case and continue
+independent validation. Do not revive the rejected universal-enforcement experiment.
+The unchanged guard's deeper qualification cases follow; select those affected by
+this update rather than repeating every historical failure probe.
 
 Run the following in disposable projects, with original inputs and evaluator
 outside worker write scope. Preserve the authorized model/provider/authentication.

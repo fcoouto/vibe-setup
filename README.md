@@ -23,9 +23,11 @@ does not configure every project automatically.
 The [complete recipe](skills/vibe-setup/README.md) covers source selection,
 installation, trust, client qualification, evidence, review, maintenance and
 rollback. Its `install.py` installs only the project-local subagent guard.
-The source helper also supports [verified worktrees and recoverable setup](skills/vibe-setup/onboarding.md);
-Phase 3 adds recoverable PR publication and default-on, opt-out cleanup. Automatic
-client wiring and App/VS Code qualification remain Phase 4.
+The integrated skill uses a small Python helper for [verified worktrees and
+recoverable setup](skills/vibe-setup/onboarding.md), PR publication and default-on
+cleanup with opt-out. Normal tasks invoke the helper through project instructions.
+App and VS Code qualification remains evidence for the actual client/version/root;
+installation alone never establishes execution.
 
 ## Develop
 

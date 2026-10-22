@@ -1,10 +1,10 @@
-# Recoverable setup: Phase 2
+# One-prompt onboarding with recoverable setup
 
 A coordinator can now preview and apply the reviewed project-local guard recipe
 in a verified task worktree, then resume an interrupted application. The helper
 uses Python 3.11+ standard library and Git on macOS/Linux. Run it from the complete
-reviewed skill package: it reuses the adjacent installer and assets. It is not yet
-a standalone project-installed script.
+reviewed skill package: it reuses the adjacent installer and assets. Keep the helper and its assets together in the installed skill; do not copy
+individual files into projects or add a runtime service.
 
 ## One prompt, bounded automation
 
@@ -15,7 +15,8 @@ Use this prompt with the reviewed package available to the agent:
 > or verify a task worktree before changes. Preview the setup, apply compatible
 > changes, and resume safely if interrupted. Ask only for missing decisions or
 > manual actions the tools cannot perform. Report file setup, client validation
-> and delivery separately.
+> and delivery separately. Automate PR delivery and cleanup where possible; keep
+> cleanup ON unless I opt out, with remote branches removed before the worktree.
 
 The skill still owns complete toolkit onboarding: project decisions, applicable
 instructions, tools, validation and review. This helper configures only these
@@ -36,6 +37,41 @@ explicit reconciliation before any recipe file is written. Existing lifecycle
 opt-out is preserved; absent policy defaults to enabled. Cleanup defaults ON;
 `auto_cleanup=false` preserves resources after merge. Phase 3 provides explicit
 [publication and cleanup](task-lifecycle.md) operations from the reviewed package.
+
+## Decisions without needless questions
+
+Inspect existing project choices before asking. Reuse the selected repository,
+clients, publication authority, actor and transport when evidence resolves them.
+Ask only for a consequential missing choice, such as which repository in an
+umbrella workspace or which already-authenticated actor may publish. Git author,
+Git transport identity and GitHub actor are separate facts. Never ask for tokens
+in chat. Use the user's existing connector, GitHub App, CLI, token-backed transport
+or SSH setup where applicable; changing access requires its own authority.
+
+Missing `gh` or PR permissions leaves publication pending, not a reason to abandon
+verified local work. Supply concrete manual lookup/push/PR actions, then reconcile
+with `resume`; label inaccessible facts as user-confirmed when explicitly supplied.
+Project trust precedes hook trust. If hooks are absent from the UI, inspect the
+disabled project layer before repeating approval instructions. See the exact
+[trust sequence](README.md#3-establish-trust-and-actual-execution).
+
+Explain that cleanup is ON by default and can be disabled independently. Do not
+force a preference question or ask again after an explicit choice. Cleanup runs
+once after observed merges, never as a background monitoring service.
+
+During onboarding, adapt the template's normal-task instructions into the existing
+project guide with the actual installed helper/contract paths. Preserve unrelated
+instructions and nested guides. This is separate from the seven-file setup recipe;
+`apply` does not overwrite `AGENTS.md`. On later tasks, agents use the helper
+through those project instructions instead of invoking full onboarding again.
+
+| Operation | When to use it |
+| --- | --- |
+| `inspect` | Read project facts; with a task UUID, preview setup or a publication snapshot. |
+| `start` | Create/adopt a task worktree and verify it before implementation. |
+| `apply` | Apply the exact compatible setup plan in the verified worktree. |
+| `sync` | Commit/push and reconcile one planned checkpoint, blocker or readiness event. |
+| `resume` | Reconcile the existing setup/publication event; delivered events perform merge/cleanup checks with fresh usage. |
 
 ## Preview, apply, resume
 
@@ -128,7 +164,7 @@ separate authorized setup step. The helper does not change installed user skills
 global client settings, credentials or trust. App and VS Code validation remains
 separate evidence; these filesystem tests do not qualify either client.
 
-Phase 3 now provides explicit PR synchronization and cleanup. The coordinator
+The integrated skill uses the helper for PR synchronization and cleanup. The coordinator
 uses the established `[BLOCKED]`/`[READY]` rules and concrete manual delivery steps.
 Cleanup must confirm every associated PR merged, delete and verify remote branches
 first, then remove the local worktree. Setup itself performs none of those deletions;

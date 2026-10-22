@@ -1,10 +1,9 @@
 # Task worktrees, publication and cleanup
 
-The source package now provides read-only inspection and verified worktree
-startup through `workflow.py`. Phase 2 adds [recoverable recipe setup](onboarding.md)
-in the verified worktree, including the lifecycle policy. Phase 3 adds recoverable
-PR synchronization and ordered cleanup. Automatic skill/client wiring remains
-Phase 4. The existing `install.py`
+The self-contained installed skill provides read-only inspection, verified
+worktree startup, [recoverable setup](onboarding.md), PR synchronization and
+ordered cleanup through `workflow.py`. The onboarding skill coordinates these
+operations and adds direct helper instructions for normal project tasks. The existing `install.py`
 still installs only the subagent component; it does not install the helper or
 policy asset. Run the helper from the complete reviewed package.
 
