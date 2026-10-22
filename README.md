@@ -23,6 +23,8 @@ does not configure every project automatically.
 The [complete recipe](skills/vibe-setup/README.md) covers source selection,
 installation, trust, client qualification, evidence, review, maintenance and
 rollback. Its `install.py` installs only the project-local subagent guard.
+The source helper also supports [verified worktrees and recoverable setup](skills/vibe-setup/onboarding.md);
+PR automation and automatic client wiring remain later phases.
 
 ## Develop
 

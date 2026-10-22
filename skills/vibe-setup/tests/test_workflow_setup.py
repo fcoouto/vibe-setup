@@ -16,7 +16,7 @@ from uuid import uuid4
 HELPER = Path(__file__).resolve().parents[1] / "workflow.py"
 
 
-class WorkflowTests(unittest.TestCase):
+class WorkflowFixture(unittest.TestCase):
     def setUp(self):
         self.assertTrue(HELPER.exists(), "Phase 1 helper has not been implemented")
         spec = importlib.util.spec_from_file_location("workflow", HELPER)
@@ -63,6 +63,8 @@ class WorkflowTests(unittest.TestCase):
         self.git(self.source, "worktree", "add", "-b", self.request["branch"],
                  str(self.target), "main")
 
+
+class WorkflowTests(WorkflowFixture):
     def test_default_policy_creates_worktree_and_preserves_explicit_opt_out(self):
         self.assertTrue(self.workflow.load_policy(self.source))
         policy = self.policy('schema_version = 1\n[task_lifecycle]\nenabled = false\n')

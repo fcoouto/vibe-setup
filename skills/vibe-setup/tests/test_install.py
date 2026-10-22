@@ -1,6 +1,7 @@
 """Preservation and repeat-application checks for the portable installer."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -22,6 +23,25 @@ class InstallTests(unittest.TestCase):
     def snapshot(self):
         return {str(p.relative_to(self.root)): p.read_bytes()
                 for p in self.root.rglob("*") if p.is_file() and ".git" not in p.parts}
+
+    def test_pure_plan_matches_installer_bytes_and_return_contract(self):
+        (self.root / ".gitignore").write_bytes(b"custom/\r\n")
+        before = self.snapshot()
+        writes = INSTALL.plan_install(self.root)
+        self.assertEqual(before, self.snapshot())
+        self.assertTrue(all(isinstance(value, bytes) for value in writes.values()))
+        self.assertEqual(INSTALL.install(self.root, check=True), sorted(writes))
+        self.assertEqual(before, self.snapshot())
+        self.assertEqual(INSTALL.install(self.root), sorted(writes))
+        for name, payload in writes.items():
+            self.assertEqual((self.root / name).read_bytes(), payload)
+        self.assertEqual(INSTALL.plan_install(self.root), {})
+
+    def test_plan_rejects_nonregular_destination_before_reading_it(self):
+        path = self.root / ".gitignore"
+        os.mkfifo(path)
+        with self.assertRaises(ValueError):
+            INSTALL.plan_install(self.root)
 
     def test_transient_declarations_excluded_without_losing_custom_rules(self):
         for name in (".gitignore", ".graphifyignore"):

@@ -1,10 +1,11 @@
-# Task worktrees: Phase 1
+# Task worktrees and recoverable setup
 
 The source package now provides read-only inspection and verified worktree
-startup through `workflow.py`. Recoverable installation, PR synchronization and
+startup through `workflow.py`. Phase 2 adds [recoverable recipe setup](onboarding.md)
+in the verified worktree, including the lifecycle policy. PR synchronization and
 automatic skill/client wiring remain later phases. The existing `install.py`
-still installs only the subagent component; it does not install or activate this
-helper or its policy asset yet.
+still installs only the subagent component; it does not install the helper or
+policy asset. Run the helper from the complete reviewed package.
 
 ## Inspect first
 
@@ -100,7 +101,7 @@ contain no credentials and are bookkeeping, not a tamper-proof enforcement
 boundary. Leave them in place when an operation is interrupted.
 
 Missing Git/PR access is a publication prerequisite. It does not prevent verified
-local work. Phase 1 does not push, create PRs or claim delivery readiness. The
+local work. The helper does not yet push, create PRs or claim delivery readiness. The
 coordinator currently handles publication under the approved rules: start PRs
 as `[BLOCKED]`, attempt one synchronization per phase, preserve human text, and
 promote to `[READY]` only after non-draft status and applicable merge requirements
@@ -110,7 +111,7 @@ what remains unverified. Never merge automatically.
 ## Explicit opt-out
 
 The absence of `.codex/vibe-workflow.toml` means enabled. This packaged asset is
-the future installation default, not native Codex configuration:
+the Phase 2 setup default, not native Codex configuration:
 
 ```toml
 schema_version = 1
