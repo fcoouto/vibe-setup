@@ -8,7 +8,7 @@ The user accepts that the methodology cannot control every native agent action. 
 
 The former requirement for an unbypassable host boundary is removed. Protected host-owned receipts, guaranteed interception of chat/completion, and universally atomic PR metadata updates are no longer release prerequisites. Earlier NO-GO investigations remain valid historical findings; they are not passing tests, but no longer block this revised scope. Previous design/plan versions are preserved in private research records outside the product repository.
 
-Keep one skill and one small Python helper. No MCP server, daemon, custom agent host, credential broker, model routing, permission changes, automatic merge or cleanup. Preserve the current model, reasoning, provider, authentication, permissions, useful customizations and existing work.
+Keep one skill and one small Python helper. No MCP server, daemon, custom agent host, credential broker, model routing, permission changes or automatic merge. Automatic cleanup after confirmed merges is enabled by default, with an independent user opt-out. Preserve the current model, reasoning, provider, authentication, permissions, useful customizations and existing work.
 
 ## Approach
 
@@ -50,7 +50,7 @@ Keep one source helper at `skills/vibe-setup/workflow.py`, installed as `.codex/
 | `start` | Create/reconcile and validate a task-owned linked worktree |
 | `apply` | Revalidate task context and plan, then apply journaled owned changes |
 | `sync` | Verify local state, attempt publication/update/readback, or return concrete manual actions |
-| `resume` | Reconcile files, Git and available remote facts after interruption or human action |
+| `resume` | Reconcile files, Git and available remote facts after interruption or human action; run eligible post-merge cleanup |
 
 Mutating requests use validated JSON through stdin and explicit subprocess argument arrays. Do not accept arbitrary executable fields or `verified=true`. Validate actual Git facts at entry and before consequential mutations. The skill requires equivalent worktree checks around direct native edits; the helper is not a sandbox for other tools.
 
@@ -65,9 +65,12 @@ schema_version = 1
 
 [task_lifecycle]
 enabled = true
+auto_cleanup = true
 ```
 
 Default on when released; preserve explicit user opt-out and reject malformed policy. Never disable the feature automatically to bypass a failure. Opt-out does not delete worktrees, close PRs or change other project rules. No new host attestation system is required to represent the human's choice.
+
+The independent `auto_cleanup` preference defaults to true when absent. Explicit false survives setup, upgrades and resume. Disabling the whole lifecycle also disables its automatic cleanup. This is a planned policy extension; the shipped Phase 1 helper does not yet accept or execute it.
 
 ## Checkpoints, PRs and completion
 
@@ -110,11 +113,26 @@ Before changing a `[READY]` PR again, withdraw the prior readiness claim and res
 
 After any manual action, reread accessible Git/PR facts and record observed versus user-confirmed evidence. Resume the same task/event; do not create duplicates. An unavailable read interface does not invalidate the user's confirmation, but remains a stated limit.
 
+## Automatic cleanup after merge
+
+When lifecycle reconciliation (`sync` or `resume`) confirms that **every PR associated with a worktree is merged**, run the cleanup task unless `auto_cleanup=false`. This runs when merge confirmation is observed, including after the user reports a merge; it does not add a background daemon or polling service. Onboarding explains the default and exposes the opt-out without repeatedly requesting approval for an already-authorized cleanup.
+
+Reconcile the complete task-owned PR/branch inventory from durable records and paginated remote lookup, including prior branches and PRs for that worktree. Require at least one PR and an observed merged state for every associated PR. Open, draft, closed-but-unmerged, missing, ambiguous or inaccessible PR state prevents automatic cleanup. Local branch ancestry alone is not proof of a merged PR, especially after squash/rebase merges. If the inventory or merge status cannot be verified, preserve resources and give concrete manual recovery instructions.
+
+Before any deletion, recheck task ownership, canonical path, policy and merged-head identities. Stop owned writers and move command/coordinator context outside the target. Refuse primary, shared, pinned, foreign or actively used worktrees and refuse local commits beyond the merged PR heads. Preserve dirty tracked files, untracked files and ignored files; request recovery rather than discarding them. Remote default/protected/shared branches are not cleanup targets, and a branch reused or advanced after its PR merged must be retained.
+
+Perform cleanup in this order:
+
+1. **Delete the associated remote branches.** Use an exact repository/ref and a conditional deletion against the observed merged head, so an advanced/recreated branch cannot be deleted by a stale observation. Confirm each ref is absent; a branch already deleted by GitHub is an idempotent success. If any branch deletion fails or is uncertain, stop before local removal and reconcile the partial result.
+2. **Delete the local worktree folder.** Only after all remote deletions are confirmed, recheck local safety and remove the exact registered worktree through the native managed-worktree lifecycle or ordinary non-forced Git worktree removal. Confirm the directory and registration are gone. Never use an unrestricted recursive delete or silently force removal. Local branch-ref deletion is not part of this requirement.
+
+Keep cleanup intent, confirmed PR/head/ref identities, per-branch results and local removal outcome in the Git common-directory record outside the removed worktree. Resume the same operation after interruption; reread remote and local state before retrying. Report cleanup success, opt-out, or pending manual action separately from merge success. A failed cleanup does not reverse the merge or claim the worktree was removed.
+
 ## Recovery, acceptance and delivery
 
 Journal owned before/after writes with atomic individual file replacement and an advisory lock. Retry only recognized states. A rollback is a reviewed inverse change to unchanged owned files; never restore an old entire state or overwrite later work. Do not snapshot credentials or unknown secret-bearing configuration into recovery records.
 
-Acceptance requires verified worktree startup/refusal, correct worker directories, safe reruns, preserved customizations, interrupted-operation recovery, honest local/remote status, exact PR tags and useful manual instructions. Exercise ordinary successful and failing paths in actual App and VS Code. Document hook limits instead of requiring universal fail-closed enforcement.
+Acceptance requires verified worktree startup/refusal, correct worker directories, safe reruns, preserved customizations, interrupted-operation recovery, honest local/remote status, exact PR tags, cleanup opt-out preservation, all-PR merge confirmation, ordered cleanup and useful manual instructions. Exercise ordinary successful and failing paths in actual App and VS Code. Document hook limits instead of requiring universal fail-closed enforcement.
 
 Tracked setup and ignored local activation differ. Report which checkout/client was exercised. A merge does not activate ignored settings in another checkout; reconcile activation when authorized. Update the installed skill only after review and applicable installation authorization.
 
