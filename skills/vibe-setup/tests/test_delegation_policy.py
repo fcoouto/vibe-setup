@@ -72,11 +72,12 @@ class DelegationPolicyTests(unittest.TestCase):
                   "tools": ["python"], "context_limit": 8000, "output_limit": 2000}
         if route == "local":
             qualification["binding"]["runtime_digest"] = "a" * 64
+            qualification["binding"]["permissions"] = "workspace"
             self.save(name + "-q", qualification)
             result["local_status_ref"] = self.save(name + "-status", {"routing_enabled": True, "approved": True,
                 "assessment_passed": True, "admitted": True, "expires_at": self.future,
                 "runtime_digest": "a" * 64, "approval_ref": self.receipt, "assessment_ref": self.receipt,
-                "admission_ref": self.receipt, "evaluation_path": False})
+                "admission_ref": self.receipt, "evaluation_path": False, "permissions": "workspace"})
         return result
 
     def call(self, operation="plan-delegation", request=None):
@@ -200,6 +201,20 @@ class DelegationPolicyTests(unittest.TestCase):
         result = self.call("report-delegation", request)
         self.assertFalse(result["candidate_accepted"])
         self.assertIsNone(result["accounting"]["operating_difference"])
+
+    def test_local_permissions_bind_approved_scope_without_inheriting_coordinator_access(self):
+        local = self.request["candidates"][1]
+        permissions = {"execution": "proposal_only", "host_tools": []}
+        self.edit_evidence(local["local_status_ref"], lambda s: s.update(permissions=permissions))
+        self.edit_evidence(local["qualification_ref"], lambda q: q["binding"].update(permissions=permissions))
+        request = self.report_request()
+        request["observation"]["permissions"] = permissions
+        result = self.call("report-delegation", request)
+        self.assertTrue(result["candidate_accepted"])
+        request["observation"]["permissions"] = "workspace"
+        self.assertEqual(self.call("report-delegation", request)["status"], "blocked")
+        self.edit_evidence(local["local_status_ref"], lambda s: s.update(permissions="workspace"))
+        self.assertEqual(self.call()["decision"]["route"], "native")
 
     def measurements(self):
         def span(name, owner, amount):
@@ -431,17 +446,18 @@ class DelegationPolicyTests(unittest.TestCase):
                 "expires_at": self.future, "max_calls": 1, "used_calls": 0, "scope": qualification["scope"],
                 "case_refs": [self.receipt], "rubric_ref": self.receipt, "stop_conditions": ["Stop after one call"], "disposable": True})
             self.assertEqual(self.call()["decision"]["route"], "local")
-            for field, replacement in (("runtime_digest", "b" * 64), ("version", "v2"),
+            for field, replacement in (("runtime_digest", "b" * 64), ("permissions", "expanded-scope"), ("version", "v2"),
                                        ("provider", "another-local-runtime"), ("route", "native")):
                 with self.subTest(mode=mode, field=field):
                     changed = copy.deepcopy(qualification)
                     changed["binding"][field] = replacement
-                    if field == "runtime_digest":
-                        self.edit_evidence(candidate["local_status_ref"], lambda s: s.update(runtime_digest=replacement))
+                    if field in ("runtime_digest", "permissions"):
+                        self.edit_evidence(candidate["local_status_ref"], lambda s: s.update({field: replacement}))
                     else:
                         candidate[field] = replacement
                     if field == "route":
                         changed["binding"].pop("runtime_digest")
+                        changed["binding"].pop("permissions")
                     Path(candidate["qualification_ref"]).write_text(json.dumps(changed))
                     self.assertEqual(self.call()["decision"]["route"], "inherited")
                     candidate.update(original)

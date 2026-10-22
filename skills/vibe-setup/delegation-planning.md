@@ -74,7 +74,8 @@ All qualification records require `state`, `binding`, `scope`, `expires_at`,
 `qualified` and `suspended`. Expiry timestamps need an explicit timezone.
 
 `binding` contains exact `route`, `model`, `effort`, `provider`, `version`, `client`,
-`client_version` and `tool`; local bindings also contain `runtime_digest`.
+`client_version` and `tool`; local bindings also contain `runtime_digest` and
+`permissions`, the approved plugin execution scope (a nonempty string or object).
 `scope` contains `role`, `specialty`, `domain`, `language`, assessed integer
 `tiers`, `risks`, `context_tokens`, `output_tokens` and `tools`. A larger tier
 does not implicitly certify a smaller one: list the assessed tiers explicitly.
@@ -91,11 +92,15 @@ files for change detection; it does not authenticate their authors or rerun case
 
 `local_status_ref` points to a normalized record with boolean `routing_enabled`,
 `approved`, `assessment_passed`, `admitted`, `evaluation_path`; `expires_at`;
-SHA-256 `runtime_digest`; and original plugin `approval_ref`, `assessment_ref`,
+SHA-256 `runtime_digest`; approved `permissions`; and original plugin `approval_ref`, `assessment_ref`,
 `admission_ref`. The first four gates must pass. Evaluation additionally needs
 the plugin's authorized evaluation path. Copy observations from the installed
 plugin's supported interface; Vibe cannot grant these approvals. Recheck admission
 immediately before dispatch. Planning neither reserves capacity nor enables routing.
+Local workers can have narrower permissions than the Coordinator, such as returning
+proposals without host tools. Their qualification, authorization manifest and
+observed result must match that approved local scope. Native worker permissions
+remain those of the Coordinator. The helper never grants permissions on either route.
 
 Evaluation and canary modes require an absolute `manifest` file with `mode`,
 `candidate_bindings`, `authorization_ref`, `expires_at`, `max_calls`, `used_calls`,

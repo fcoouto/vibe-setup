@@ -107,11 +107,18 @@ def evidence(path, wf, refs, parse=False):
     return raw
 
 
+def permission_scope(value):
+    if isinstance(value, dict) and value:
+        canonical(value)
+    else:
+        text(value)
+
+
 def settings(value):
     fields(value, ("model", "effort", "provider", "permissions", "session_id"))
     for key in value:
-        if key == "permissions" and isinstance(value[key], dict) and value[key]:
-            canonical(value[key])
+        if key == "permissions":
+            permission_scope(value[key])
         else:
             text(value[key])
 
@@ -215,12 +222,14 @@ def candidate_reason(candidate, request, difficulty, now, wf, refs):
     if candidate["route"] == "local":
         local = evidence(candidate.get("local_status_ref"), wf, refs, True)
         fields(local, ("routing_enabled", "approved", "assessment_passed", "admitted", "expires_at", "runtime_digest",
-                       "approval_ref", "assessment_ref", "admission_ref", "evaluation_path"))
+                       "approval_ref", "assessment_ref", "admission_ref", "evaluation_path", "permissions"))
         for key in ("routing_enabled", "approved", "assessment_passed", "admitted", "evaluation_path"):
             boolean(local[key])
         if not re.fullmatch(r"[a-f0-9]{64}", text(local["runtime_digest"])):
             raise ValueError("Local runtime digest is invalid")
         binding["runtime_digest"] = local["runtime_digest"]
+        permission_scope(local["permissions"])
+        binding["permissions"] = local["permissions"]
         for key in ("approval_ref", "assessment_ref", "admission_ref"):
             evidence(local[key], wf, refs)
         if not all(local[key] for key in ("routing_enabled", "approved", "assessment_passed", "admitted")) or timestamp(local["expires_at"]) <= now:
@@ -252,10 +261,14 @@ def candidate_reason(candidate, request, difficulty, now, wf, refs):
             raise ValueError("Manifest must freeze a bounded candidate binding map")
         for identity, authorized in bindings.items():
             text(identity)
-            fields(authorized, ("route", "model", "effort", "provider", "version", "client", "client_version", "tool"), ("runtime_digest",))
-            for value in authorized.values():
-                text(value)
-            if authorized["route"] not in ("local", "native") or (("runtime_digest" in authorized) != (authorized["route"] == "local")):
+            fields(authorized, ("route", "model", "effort", "provider", "version", "client", "client_version", "tool"), ("runtime_digest", "permissions"))
+            for key, value in authorized.items():
+                if key == "permissions":
+                    permission_scope(value)
+                else:
+                    text(value)
+            if (authorized["route"] not in ("local", "native")
+                    or any((key in authorized) != (authorized["route"] == "local") for key in ("runtime_digest", "permissions"))):
                 raise ValueError("Manifest must bind the exact route and local runtime when applicable")
             if "runtime_digest" in authorized and not re.fullmatch(r"[a-f0-9]{64}", authorized["runtime_digest"]):
                 raise ValueError("Manifest local runtime digest is invalid")
@@ -407,8 +420,11 @@ def plan(root, request, wf):
             pool.sort(key=lambda item: item[0]["expected_cost"]["total"])
             ranking = "observed_cost_estimate"
         chosen, request_hash = pool[0]
+        worker_permissions = (evidence(chosen["local_status_ref"], wf, refs, True)["permissions"]
+                              if chosen["route"] == "local" else request["coordinator"]["permissions"])
         decision = {"route": chosen["route"], "candidate_id": chosen["id"], "model": chosen["model"], "effort": chosen["effort"],
                     "provider": chosen["provider"], "request_hash": request_hash, "qualification_ref": chosen["qualification_ref"],
+                    "permissions": worker_permissions,
                     "reason": "Qualified local preference" if chosen["route"] == "local" else "Eligible supported native pair",
                     "overrides": {"model": chosen["model"], "reasoning_effort": chosen["effort"], "fork_turns": "none"} if chosen["route"] == "native" else {}}
         for candidate, _ in eligible:
@@ -523,7 +539,7 @@ def report(root, request, wf):
         failures.append("Requested and observed worker settings differ or are unknown")
     if observation["coordinator_after"] != saved["coordinator"]:
         failures.append("Coordinator settings changed or are unknown")
-    if observation["permissions"] != saved["coordinator"]["permissions"]:
+    if observation["permissions"] != chosen["permissions"]:
         failures.append("Worker permissions differ or are unknown")
     accepted = not failures and observation["outcome"] == "accepted" and not observation["rescued"]
     return wf["result"]("report-delegation", "blocked" if failures else "ok", "observation_only",
