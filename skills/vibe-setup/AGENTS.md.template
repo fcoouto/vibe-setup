@@ -61,6 +61,11 @@ authentication and permissions. Inspect actual native model/effort support and
 effective defaults; availability does not grant authorization to switch.
 Do not add a provider, proxy or paid API to enable delegation.
 
+The main agent is Coordinator. Assign each worker a [role and separate specialty](.codex/delegation-brief.md#role-and-specialty),
+carrying them through local execution and native fallback using the installed
+contract. These labels never select native profiles, change execution settings or
+prove competence. Dashboard badge delivery needs separate evidence.
+
 Use the [task/specialty guide](.codex/delegation-brief.md#task-and-specialty-guide)
 to define the assignment's required ability. Match evidence to the concrete model
 and task scope; an idle runtime does not prove competence. Mark missing matching

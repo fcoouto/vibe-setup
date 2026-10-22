@@ -8,7 +8,9 @@ native subagents, validation and independent review.
 ## Delegation and model policy
 
 Start with the [delegation policy](skills/vibe-setup/delegation-brief.md):
+[roles alongside specialties](skills/vibe-setup/delegation-brief.md#role-and-specialty),
 [task/specialty table](skills/vibe-setup/delegation-brief.md#task-and-specialty-guide),
+[Habblaud badge compatibility](skills/vibe-setup/delegation-brief.md#role-visibility-in-habblaud),
 [ability versus runtime capacity](skills/vibe-setup/delegation-brief.md#demonstrated-ability-versus-runtime-capacity),
 [route selection](skills/vibe-setup/delegation-brief.md#choose-the-execution-route),
 [model discovery and capacity](skills/vibe-setup/delegation-brief.md#discover-models-and-check-capacity),

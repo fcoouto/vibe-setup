@@ -12,7 +12,9 @@ Its procedures stay in that project. The user's authorization and active project
 instructions govern both routes; availability alone grants no authority.
 
 - [Choose the execution route](#choose-the-execution-route)
+- [Role and specialty](#role-and-specialty)
 - [Task and specialty guide](#task-and-specialty-guide)
+- [Role visibility in Habblaud](#role-visibility-in-habblaud)
 - [Demonstrated ability versus runtime capacity](#demonstrated-ability-versus-runtime-capacity)
 - [Discover models and check capacity](#discover-models-and-check-capacity)
 - [Local proposal and native fallback workflow](#local-proposal-and-native-fallback-workflow)
@@ -45,6 +47,59 @@ permissions. Reuse existing approvals; ordinary task delegation does not authori
 installation, assessment, new approvals or route activation. Do not weaken task
 requirements to fit a local model, or claim savings without evidence.
 
+## Role and specialty
+
+Assign a **Role** for responsibility and a **Specialty** for the knowledge and
+checklist the assignment needs. Keep **Status** separate: a Builder running tests
+is still a Builder. Roles belong to assignments, not permanently to models or
+people. Use these exact, case-sensitive role names:
+
+| Role | Responsibility |
+| --- | --- |
+| Coordinator | Own scope, delegation, acceptance and integration. |
+| Scout | Explore code and map dependencies. |
+| Builder | Implement changes. |
+| Tester | Verify behavior and edge cases. |
+| Reviewer | Independently inspect changes. |
+| Scribe | Maintain documentation. |
+| Investigator | Diagnose failures and evaluate approaches. |
+
+The existing main agent is the Coordinator; do not spawn a placeholder child to
+give it a badge. Choose one role per assignment and keep it stable for that
+assignment. Multiple roles can share a specialty, for example Builder and Reviewer
+with Security-sensitive work. Independent review still requires a different
+agent from the writer; changing a writer's label does not supply independence.
+
+A role describes responsibility, not demonstrated competence, authority or an
+execution profile. It never selects a model, provider, reasoning effort, routing,
+authentication, tools or permissions. Preserve the approved execution settings.
+This vocabulary does not create a fixed agent roster or require delegation.
+
+For new native declarations, supply `role` and `specialty` alongside the existing
+fields. The guard accepts legacy declarations without either field; missing
+metadata means unspecified, not inferred from a task name or model. Before using
+the new fields in a destination project, check its installed guard: older guards
+reject extra keys. Review and update the guard and guide together, preserving
+customizations. Until then, put the labels in existing `instructions` text without
+claiming structured metadata or badge delivery. Do not edit an active declaration.
+
+### Local-model handoff
+
+The coordinator carries the same assignment metadata to local execution and native
+fallback: `{"role": "Reviewer", "specialty": "Security-sensitive work"}`. This is
+a portable handoff pair, not a new local brief schema or capability identifier.
+Keep it separate from the actual model, source/provider, assessment and task state.
+The local plugin owns storage, visibility transport and any presentation binding.
+
+Use only fields supported by the installed plugin. For schema-2 local briefs
+without dedicated metadata support, include `Role: Reviewer. Specialty:
+Security-sensitive work.` in the existing `behavior_contract`; do not add unknown
+top-level keys. Include it before submission, within the approved input budget;
+do not rewrite a submitted brief or its identity/hash to change a badge. A plugin
+adapter may consume the explicit pair through its own supported interface, but
+Vibe does not infer a role from the model or duplicate the plugin's job registry.
+Local proposals still require native verification; a role grants no capability.
+
 ## Task and specialty guide
 
 A specialty identifies the knowledge and checklist a task needs. It does not
@@ -57,20 +112,21 @@ installed model lacks these abilities. Update a model/task pair's status in the
 private setup record only from matching evidence; do not certify an entire
 specialty from one narrow success.
 
-| Specialty | Representative task | Required demonstration | Default evidence status |
-| --- | --- | --- | --- |
-| Code exploration | Explain supplied code and its callers. | Source-grounded claims, correct relationships and explicit context limits. | **Not assessed** |
-| Documentation | Update a function's usage example. | Accurate behavior, preserved constraints and checked examples. | **Not assessed** |
-| Implementation | Fix a known defect with a clear contract. | Regression fixed, surrounding behavior preserved and relevant checks passed. | **Not assessed** |
-| Test engineering | Add boundary and failure-case tests. | Tests derived from requirements that detect relevant faulty behavior, not merely pass. | **Not assessed** |
-| Code review | Find regressions in a bounded change. | Known defects detected, missed defects and false positives evaluated, with connected callers considered. | **Not assessed** |
-| Diagnosis and design | Investigate an ambiguous failure or compare structural changes. | Evidence-backed hypotheses, alternatives and independently checked conclusions. | **Not assessed** |
-| Security-sensitive work | Review authorization or possible data exposure. | Dedicated domain assessment with adversarial cases; generic coding results are insufficient. | **Not assessed** |
+| Common role | Specialty | Representative task | Required demonstration | Default evidence status |
+| --- | --- | --- | --- | --- |
+| Scout | Code exploration | Explain supplied code and its callers. | Source-grounded claims, correct relationships and explicit context limits. | **Not assessed** |
+| Scribe | Documentation | Update a function's usage example. | Accurate behavior, preserved constraints and checked examples. | **Not assessed** |
+| Builder | Implementation | Fix a known defect with a clear contract. | Regression fixed, surrounding behavior preserved and relevant checks passed. | **Not assessed** |
+| Tester | Test engineering | Add boundary and failure-case tests. | Tests derived from requirements that detect relevant faulty behavior, not merely pass. | **Not assessed** |
+| Reviewer | Code review | Find regressions in a bounded change. | Known defects detected, missed defects and false positives evaluated, with connected callers considered. | **Not assessed** |
+| Investigator | Diagnosis and design | Investigate an ambiguous failure or compare structural changes. | Evidence-backed hypotheses, alternatives and independently checked conclusions. | **Not assessed** |
+| Reviewer | Security-sensitive work | Review authorization or possible data exposure. | Dedicated domain assessment with adversarial cases; generic coding results are insufficient. | **Not assessed** |
 
 Classify the concrete task's complexity, ambiguity, dependencies, context needs
 and verification effort. Consider risk separately: a one-line authorization
 change can require more scrutiny than a larger mechanical edit. These rows are
 task guidance, not new plugin capability identifiers or a fixed agent roster.
+The common roles are examples, not an exclusive mapping between role and specialty.
 
 For example, a frontend label change, a state-synchronization fix and an
 authentication-boundary redesign need different demonstrations. Approval for the
@@ -78,10 +134,56 @@ first does not establish ability for the others. Successful implementation also
 does not establish review ability. A bounded subtask can qualify without granting
 the model a broad specialist title.
 
+## Role visibility in Habblaud
+
+Role declarations guide agents; they do not automatically populate a dashboard.
+Keep Habblaud unchanged and qualify its existing input path separately. Inspection
+and disposable source/DOM probes against Habblaud 1.0.3
+([`faa1a012`](https://github.com/marmottajr/habblaud/tree/faa1a012b5fbf632c66dc6801c5383e53a542406))
+on 2026-10-22 established the following behavior; recheck it when the installed version changes:
+
+| Path | Observed behavior |
+| --- | --- |
+| Native child rollout | Habblaud reads `agent_role` or `agent_type` from supported spawn metadata; role text is limited to 40 characters. |
+| Existing Codex hook endpoint | A child's first `agent_type` can supply the visible role. A longer composite survives the hook path. |
+| Already visible child | The displayed role stays fixed. Later hooks or newly discovered rollout role metadata do not relabel it. A rollout role seen first takes precedence over the hook label. |
+| Main agent | Source and badge rendering use fixed main-agent labels. `Coordinator` is an assignment role, but this version cannot display it as the main badge through these inputs. |
+
+The [rollout parser](https://github.com/marmottajr/habblaud/blob/faa1a012b5fbf632c66dc6801c5383e53a542406/server/sources/codex/rollout.ts),
+[Codex source](https://github.com/marmottajr/habblaud/blob/faa1a012b5fbf632c66dc6801c5383e53a542406/server/sources/codex/source.ts)
+and [badge renderer](https://github.com/marmottajr/habblaud/blob/faa1a012b5fbf632c66dc6801c5383e53a542406/client/src/ui/widgets.ts)
+are the compatibility references. These fixtures establish parsing and rendering,
+not delivery from every Codex client or a live Docker/Node installation.
+
+Inspect the active client's actual spawn schema. A native `agent_type` may select
+a configuration profile with different models or permissions; never use one just
+to obtain a badge. When a client exposes no independent role metadata field,
+retain the role in the declaration/instructions and report badge delivery as
+unsupported or unverified. Do not invent spawn parameters, rewrite session logs,
+change native profiles or emit synthetic workers to conceal that limitation.
+
+For local workers, the plugin owns the existing-hook adapter and sends the full
+display label on the first observation of the real attempt. Pass the canonical
+role and specialty separately to that adapter. A compatible display convention
+is `LOCAL · <Role> · <actual model> · <short specialty>`: prioritize the local
+marker, role and actual model, abbreviating or omitting specialty from the badge
+first. Keep full specialty in the assignment metadata. Habblaud can visually
+ellipsize long badges from the right; hover text retains the full hook label.
+Do not send this long composite through the 40-character native rollout path or
+present a truncated model name as verified identity.
+
+Existing hooks still attach local characters to the Codex provider/account and
+ignore the hook's `model` field. Stop, interruption and expired hook presence can
+look like successful completion. A role label does not fix these identity or
+lifecycle limitations; the plugin must document them and own transport testing.
+Vibe neither installs that adapter nor changes local routing. Coordinator badge
+support remains unavailable under the unchanged-Habblaud constraint.
+
 ## Demonstrated ability versus runtime capacity
 
 | Dimension | Question it answers | Evidence to use |
 | --- | --- | --- |
+| Role | What responsibility does this assignment carry? | Its explicit assignment and ownership; no competence claim. |
 | Specialty | What knowledge and checklist does this assignment require? | The task, domain constraints and acceptance criteria. |
 | Demonstrated ability | Has this model met comparable requirements within this scope? | Matching model/version assessment results, including task type, language, complexity, context limits and failures. |
 | Runtime capacity | Can the approved model safely execute this task now? | The plugin's current admission and resource evidence. |
@@ -234,7 +336,8 @@ Actual behavior still requires a real client fixture.
    above the software repository, rather than that repository's Git root.
 2. Choose a native task name, such as `parser_fix`. Write the complete declaration
    below into `.codex-delegations/parser_fix.json` as **raw JSON**, without Markdown
-   fences. Finish writing before dispatch; keep it unchanged until the worker ends.
+   fences. Assign its role and specialty; keep the task name as the unique task
+   identity. Finish writing before dispatch; keep it unchanged until the worker ends.
 3. Call the native spawn tool with `task_name: "parser_fix"`. Its task message
    must name the harness root and include exactly one declaration pointer, for example:
    `Harness root: <absolute harness root>. Read .codex-delegations/parser_fix.json before work.`
@@ -267,6 +370,8 @@ A writer's `.codex-delegations/parser_fix.json`:
 
 ```json
 {
+  "role": "Builder",
+  "specialty": "Implementation",
   "objective": "Fix the parser's empty-list regression.",
   "context": "Read src/parser.py and tests/test_parser.py. Empty lists currently fail.",
   "instructions": "Read local instructions. Preserve other input handling and unrelated edits.",
@@ -285,6 +390,8 @@ An independent reader's `.codex-delegations/parser_review.json` for native
 
 ```json
 {
+  "role": "Reviewer",
+  "specialty": "Code review",
   "objective": "Review the parser change for regressions.",
   "context": "Read the working diff, src/parser.py and tests/test_parser.py.",
   "instructions": "Read local instructions. Report actionable findings with locations; make no writes. Avoid checks that create artifacts.",
@@ -337,8 +444,16 @@ instructions, not hook-enforced model routing or proof of host ownership.
 
 ## Declaration schema
 
-The object contains exactly the fields shown. Duplicate keys, comments,
-non-finite numbers, extra fields and trailing commas are rejected. `objective`,
+The object requires all fields shown except `role` and `specialty`, which are
+optional for compatibility with existing declarations. New assignments should
+include both. When present, `role` is one exact name from the role table and
+`specialty` is a nonblank string of at most 4,096 characters. Either may be omitted
+independently. Unknown keys remain rejected; neither field changes native input,
+write scope, required checks or report validation. The guard validates their
+structure only, not assignment truth, model ability or dashboard delivery.
+
+Duplicate keys, comments, non-finite numbers, unknown fields and trailing commas
+are rejected. `objective`,
 `context` and `instructions` are nonblank strings. `allowed_files`,
 `mutable_resources`, `dependencies`, `acceptance` and `checks` are string arrays;
 only `acceptance` and `checks` must be nonempty. All strings have at most 4,096

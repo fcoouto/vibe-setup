@@ -10,7 +10,9 @@ authorization policy. No machine-specific endpoint, account or model choice is e
 ## Delegation policy: start here
 
 The [delegation policy and execution contract](delegation-brief.md) explains
+[roles alongside specialties](delegation-brief.md#role-and-specialty),
 [task/specialty requirements](delegation-brief.md#task-and-specialty-guide),
+[Habblaud badge compatibility](delegation-brief.md#role-visibility-in-habblaud),
 [demonstrated ability versus runtime capacity](delegation-brief.md#demonstrated-ability-versus-runtime-capacity),
 [local-first route selection](delegation-brief.md#choose-the-execution-route),
 [model discovery and capacity](delegation-brief.md#discover-models-and-check-capacity),
@@ -260,8 +262,12 @@ Compare trusted native identity when exposed; otherwise report binding unverifie
 without treating missing identity alone as a task gate. Preserve the record until
 the worker ends. The hook
 checks structure by task name; it cannot prove message/record agreement or that a
-worker read it. It does not inspect or rewrite opaque native messages. Vibe adds
-no fixed role roster, task registry, scheduler or model-routing service. When
+worker read it. It does not inspect or rewrite opaque native messages. New
+declarations carry a role and specialty; both are optional in the guard for
+backward compatibility. Older guards reject these new keys, so review and update
+the installed guard and guide together before using them. Roles describe
+assignments and do not configure native agent profiles or change model/permissions.
+Vibe adds no fixed agent roster, task registry, scheduler or model-routing service. When
 already enabled, `local-model-delegation` owns its existing local queue and
 admission; Vibe supplies the coordinator policy, not a duplicate scheduler.
 

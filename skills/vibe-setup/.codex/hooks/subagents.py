@@ -13,6 +13,7 @@ SPAWN = re.compile(r"^(spawn_agent|Agent|collaboration[.]?spawn_agent|multi_agen
 BRIEF_FIELDS = {"objective", "context", "instructions", "allowed_files",
                 "mutable_resources", "dependencies", "acceptance", "checks",
                 "read_only", "budget"}
+ROLES = {"Coordinator", "Scout", "Builder", "Tester", "Reviewer", "Scribe", "Investigator"}
 REPORT_FIELDS = {"status", "summary", "changed_files", "checks", "risks",
                  "blockers", "next_action"}
 ERROR = (
@@ -96,7 +97,11 @@ def strings(value, nonempty=False):
 
 
 def valid_brief(brief):
-    if not isinstance(brief, dict) or set(brief) != BRIEF_FIELDS:
+    if not isinstance(brief, dict) or set(brief) - {"role", "specialty"} != BRIEF_FIELDS:
+        return False
+    if "role" in brief and (not isinstance(brief["role"], str) or brief["role"] not in ROLES):
+        return False
+    if "specialty" in brief and not text(brief["specialty"]):
         return False
     if not all(text(brief[key]) for key in ("objective", "context", "instructions")):
         return False
