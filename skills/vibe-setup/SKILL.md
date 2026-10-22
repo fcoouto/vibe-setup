@@ -85,6 +85,10 @@ into Vibe or apply newer repository instructions to an older installation implic
    disposable harness cases. Confirm the resolved project configuration layer is
    trusted and loaded before requesting hook approval; untrusted project hooks
    may be absent from the approval list. Follow [client qualification](README.md#3-establish-trust-and-actual-execution).
+   Before a native probe, verify its session root and prepare the complete
+   [dispatch arguments](delegation-brief.md#prepare-each-dispatch), including the
+   required top-level `task_name`. A rejected dispatch consumes a single-attempt
+   run; stop and record it rather than retrying and reporting a clean pass.
    Test safe reruns and customizations. Record installation, discovery and
    execution separately. Request necessary trust/restart/authentication actions;
    continue work independent of those blockers. Hooks are guardrails and can
