@@ -266,3 +266,32 @@ Incomplete updates return `status: "action_required"` (CLI exit 2); complete one
 return `status: "ok"` (exit 0). Invalid requests fail with the existing blocked
 status. Required source tests and review gate every destination write; equivalent
 target requirements gate that target. Record real check evidence before apply.
+
+## Offer the next project update
+
+After `status-update` confirms `complete: true` for an installed-skill upgrade,
+report the verified release and checks, then ask once: **Would you like to update
+Vibe Setup in a project next?** Include the handoff immediately so the user can
+continue without another round trip. A verified no-change upgrade uses the same
+handoff. Skip the offer if the user already declined project updates or the
+requested project rollout is already complete.
+
+1. Create a new chat inside the project you want to update. Use its actual name
+   and root when known from the user's context; otherwise keep this instruction
+   generic until the user chooses. Do not scan for or enroll projects to fill it in.
+2. Paste this prompt:
+
+   ```text
+   Use $vibe-setup to update this project's setup with the installed skill, preserving my settings and customizations. Validate the result and report anything pending.
+   ```
+
+The new chat verifies its project root and installed skill before applying the
+project-specific workflow. The handoff does not authorize a new shared-skill
+upgrade, thread creation, messaging another chat, or project writes in the current
+chat. Follow an explicit request to continue in the current chat when its project
+root and scope are verified instead of insisting on a new chat.
+
+When required outcomes remain blocked or pending, report partial progress and
+the concrete recovery step. Do not present the success handoff as completion or
+let an optional project choice block completion of an otherwise finished skill
+upgrade. Keep installation, discovery and actual execution evidence distinct.

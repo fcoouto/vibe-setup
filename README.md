@@ -53,6 +53,20 @@ cleanup with opt-out. Normal tasks invoke the helper through project instruction
 App and VS Code qualification remains evidence for the actual client/version/root;
 installation alone never establishes execution.
 
+### Upgrade the installed skill
+
+Paste this prompt in Codex:
+
+```text
+Use $vibe-setup to safely upgrade the installed skill to the latest official release.
+```
+
+The skill reviews the release, backs up managed files, preserves settings and
+customizations, and reports conflicts or pending validation. Project setups are
+separate. After a successful skill upgrade, Codex asks whether you want to update
+a project and provides two steps: create a new chat inside that project, then
+paste the supplied project-update prompt. You choose whether and where to continue.
+
 For updates, the [update workflow](skills/vibe-setup/update-contract.md) tracks the
 shared skill, explicitly selected consumers, native client tests and delivery in
 one recoverable private record. The [qualification helper](skills/vibe-setup/qualification.md)

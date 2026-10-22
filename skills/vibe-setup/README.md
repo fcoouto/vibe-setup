@@ -73,6 +73,16 @@ every repository automatically. Verify discovery in the intended clients; if the
 new skill does not appear, refresh/restart through their supported surfaces.
 An explicit file read is useful fallback evidence, not automatic discovery proof.
 
+To upgrade only the shared skill, ask:
+
+```text
+Use $vibe-setup to safely upgrade the installed skill to the latest official release.
+```
+
+After verified completion, the agent offers an optional project update with
+instructions to start a new chat inside the chosen project and a ready-to-paste
+prompt. Updating the shared skill does not update project copies automatically.
+
 ## Complete-run contract
 
 Updates use the [scoped update transaction](update-contract.md), which joins the
