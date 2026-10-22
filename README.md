@@ -5,6 +5,27 @@ A reusable Codex skill for adopting, repairing, updating and verifying the
 in existing projects. It covers project instructions, applicable integrations,
 native subagents, validation and independent review.
 
+## Delegation and model policy
+
+Start with the [delegation policy](skills/vibe-setup/delegation-brief.md):
+[task/specialty table](skills/vibe-setup/delegation-brief.md#task-and-specialty-guide),
+[ability versus runtime capacity](skills/vibe-setup/delegation-brief.md#demonstrated-ability-versus-runtime-capacity),
+[route selection](skills/vibe-setup/delegation-brief.md#choose-the-execution-route),
+[model discovery and capacity](skills/vibe-setup/delegation-brief.md#discover-models-and-check-capacity),
+and [hook enforcement versus coordinator checks](skills/vibe-setup/delegation-brief.md#what-enforces-each-rule).
+
+Prefer [Local Model Delegation](https://github.com/fcoouto/local-model-delegation)
+for tasks that match an enabled, approved local
+model's assessed capability and available capacity. Codex verifies every proposal
+and owns integration. Otherwise use authorized native execution. Local proposals
+are not native subagents and do not pass through the native subagent hooks.
+
+The guide contains Vibe's agent-facing routing policy and native contract, and
+points to the plugin's own documentation for local execution. It is installed as
+`.codex/delegation-brief.md` in each destination project. Setup links it from that
+project's existing `AGENTS.md` and documentation; the installer does not edit those
+entry points automatically.
+
 ## Use
 
 Review the self-contained package in [`skills/vibe-setup`](skills/vibe-setup/README.md),

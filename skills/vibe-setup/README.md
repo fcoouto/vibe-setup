@@ -5,7 +5,33 @@ subagent guard. The skill coordinates the complete applicable setup; `install.py
 installs only the guard component. This recipe prioritizes the Codex App and VS
 Code extension, with supporting CLI checks; use the clients selected for the
 target project. The application retains its own commands, documentation and
-authorization policy. No service, provider, account or model name is embedded.
+authorization policy. No machine-specific endpoint, account or model choice is embedded.
+
+## Delegation policy: start here
+
+The [delegation policy and execution contract](delegation-brief.md) explains
+[task/specialty requirements](delegation-brief.md#task-and-specialty-guide),
+[demonstrated ability versus runtime capacity](delegation-brief.md#demonstrated-ability-versus-runtime-capacity),
+[local-first route selection](delegation-brief.md#choose-the-execution-route),
+[model discovery and capacity](delegation-brief.md#discover-models-and-check-capacity),
+[local verification and native fallback](delegation-brief.md#local-proposal-and-native-fallback-workflow),
+and [hook/coordinator responsibilities](delegation-brief.md#what-enforces-each-rule).
+Vibe owns routing policy and native hook contracts. Local execution procedures
+belong to [Local Model Delegation](https://github.com/fcoouto/local-model-delegation);
+the guide links to its authoritative workflow instead of copying it. Use docs
+matching the installed plugin version and actual client interfaces.
+
+Prefer enabled, approved local models through `local-model-delegation` when the
+complete task fits assessed capability and safe capacity. Codex owns verification
+and integration. Missing or ineligible local routes retain native execution under
+the user's policy. Plugin installation, model approval and route activation are
+separate; Vibe's installer does not perform them.
+
+The same agent-facing guide is installed as `.codex/delegation-brief.md`; users
+can read it too. During setup, link it
+from the target's existing `AGENTS.md` and documentation entry point, and record
+effective route/model evidence in the existing private setup/quality record.
+The installer does not edit those entry points or produce a policy dashboard.
 
 Canonical source: [fcoouto/vibe-setup](https://github.com/fcoouto/vibe-setup),
 under `skills/vibe-setup/`. Keep reusable changes in that repository and adoption
@@ -59,10 +85,14 @@ material under the user's and target project's authority.
 Read the complete Prompt block and its required source inventory: root README,
 overview, installation, onboarding playbook, tool/prompt/template indexes,
 project defaults and the project-docs manifest. Read the Codex workflow guide,
-shared AGENTS template, subagent policy, relevant component guides and all guides
+shared AGENTS template, relevant component guides and all guides
 17–23 required by the current baseline. Follow newly added requirements and
 catalog entries too; do not freeze component counts. The Claude onboarding
-playbook supplies shared context, not Codex configuration authority.
+playbook supplies shared context, not Codex configuration authority. Delegation
+and subagent rules come from [this package's policy](delegation-brief.md), subject
+to the target's instructions and user authorization. Treat upstream delegation
+material encountered in the full setup inventory as context, not an additional
+policy dependency or authority to change routes/models.
 
 Maintain these views in the existing canonical setup/quality record or task plan:
 
@@ -136,8 +166,11 @@ Preserve the main model, provider and authentication. Reuse existing integration
 do not copy another client's configuration or duplicate a global plugin locally.
 Record installed, configured, discovered and executed as separate states.
 
-Read the pinned Codex guide, shared agreements, subagent policy, catalog and guides
-17–23. Decide every catalog row by project need. Verify selected skills' names,
+Read the pinned Codex guide, shared agreements, catalog and guides 17–23 for the
+surrounding setup. For delegation, read [the local policy](delegation-brief.md)
+and inspect the installed plugin's approval, scope, capacity and routing evidence.
+Keep model inventories private and current; do not infer eligibility from names.
+Decide every catalog row by project need. Verify selected skills' names,
 source revisions, license and native discovery. Upstream skill lock hashes can
 include files intentionally omitted by the installer; do not replace them with an
 installed-directory hash without checking the installer's documented algorithm.
@@ -170,7 +203,7 @@ The initial check exits 1 when files need installation; 0 means unchanged; 2 mea
 an error or a conflict requiring review. Installation creates only these paths:
 
 - `.codex/hooks/subagents.py`: bounded standard-library event handler.
-- `.codex/delegation-brief.md`: executable-hook contract used by agents.
+- `.codex/delegation-brief.md`: user-readable policy and native hook contract.
 - `.codex/hooks.json`: merged event groups; unrelated hooks remain intact.
 - `.gitignore` and `.graphifyignore`: preserve other entries and place the
   `.codex-delegations/` exclusion last. Transient task inputs stay outside source
@@ -214,8 +247,9 @@ and deliberately reconcile their configuration scope. Do not mirror declarations
 or search other roots to conceal an unidentified active hook.
 
 Adapt the entry-point template into the existing `AGENTS.md`; the installer does
-not overwrite project instructions. The [brief contract](delegation-brief.md)
-defines exact dispatch/report fields, permitted naming variants and limits.
+not overwrite project instructions. Add the policy link to the existing human
+documentation entry point too. The [policy and contract](delegation-brief.md)
+defines local routing and exact native dispatch/report fields, naming and limits.
 Before each spawn, write the active harness root's
 `.codex-delegations/<task_name>.json` with the exact bounded brief schema. This transient input lives beside the protected `.codex`
 configuration directory so an ordinary workspace writer can prepare it. Use the
@@ -226,8 +260,10 @@ Compare trusted native identity when exposed; otherwise report binding unverifie
 without treating missing identity alone as a task gate. Preserve the record until
 the worker ends. The hook
 checks structure by task name; it cannot prove message/record agreement or that a
-worker read it. It does not inspect or rewrite opaque native messages. No fixed
-role roster, task registry, scheduler or model-routing service is added.
+worker read it. It does not inspect or rewrite opaque native messages. Vibe adds
+no fixed role roster, task registry, scheduler or model-routing service. When
+already enabled, `local-model-delegation` owns its existing local queue and
+admission; Vibe supplies the coordinator policy, not a duplicate scheduler.
 
 The final report uses exactly one standalone JSON fence tagged `delegation-report`
 or `json`, with the same required fields and limits from the contract. Multiple

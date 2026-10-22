@@ -1,4 +1,197 @@
-# Native Codex delegation contract
+# Delegation policy and execution contract
+
+This is an agent-facing policy and native delegation contract, with an overview
+for users. Setup installs it as `.codex/delegation-brief.md` and links it from
+`AGENTS.md`; agents must read the applicable instructions before delegation.
+The hooks validate JSON declarations/reports, not this Markdown file.
+
+Vibe Setup owns route preference, coordinator responsibilities and the native
+contract below. [Local Model Delegation](https://github.com/fcoouto/local-model-delegation)
+owns local model discovery, assessment, capacity, execution and verification.
+Its procedures stay in that project. The user's authorization and active project
+instructions govern both routes; availability alone grants no authority.
+
+- [Choose the execution route](#choose-the-execution-route)
+- [Task and specialty guide](#task-and-specialty-guide)
+- [Demonstrated ability versus runtime capacity](#demonstrated-ability-versus-runtime-capacity)
+- [Discover models and check capacity](#discover-models-and-check-capacity)
+- [Local proposal and native fallback workflow](#local-proposal-and-native-fallback-workflow)
+- [What enforces each rule](#what-enforces-each-rule)
+- [See the effective policy and current work](#see-the-effective-policy-and-current-work)
+- [Native dispatch and report contract](#native-codex-delegation-contract)
+
+## Choose the execution route
+
+Codex remains the coordinator: it owns scope, required tool actions, acceptance
+checks and integration. Delegate a bounded task when independent work,
+specialization or context isolation justifies the coordination cost.
+
+**Prefer eligible local models over paid/native model execution for suitable
+delegated tasks.** Local eligibility requires installed and enabled routing,
+owner approval, demonstrated ability for the task, safe runtime capacity and
+supported verification. Resolve eligibility through the plugin's own contract.
+Do not infer ability
+from a model's name, parameter count or advertised context window. A discovery
+result, installed plugin or assessment result alone is not approval.
+
+If local routing is disabled or the plugin cannot qualify the task, retain
+authorized native execution. For busy capacity or recovery, follow the plugin's
+current workflow rather than inventing a separate Vibe scheduler. Keep small tasks
+with the coordinator when delegation overhead is not justified.
+
+Explicit local prohibitions or native-only instructions override this preference.
+Preserve the coordinator's native model, reasoning, provider, authentication and
+permissions. Reuse existing approvals; ordinary task delegation does not authorize
+installation, assessment, new approvals or route activation. Do not weaken task
+requirements to fit a local model, or claim savings without evidence.
+
+## Task and specialty guide
+
+A specialty identifies the knowledge and checklist a task needs. It does not
+name a model, grant tools or certify competence. Use this guide to describe the
+actual assignment, then match it to the model's recorded assessment scope.
+
+The default status below is **Not assessed** because this portable guide supplies
+no per-model assessment evidence. It is not a live inventory or a claim that every
+installed model lacks these abilities. Update a model/task pair's status in the
+private setup record only from matching evidence; do not certify an entire
+specialty from one narrow success.
+
+| Specialty | Representative task | Required demonstration | Default evidence status |
+| --- | --- | --- | --- |
+| Code exploration | Explain supplied code and its callers. | Source-grounded claims, correct relationships and explicit context limits. | **Not assessed** |
+| Documentation | Update a function's usage example. | Accurate behavior, preserved constraints and checked examples. | **Not assessed** |
+| Implementation | Fix a known defect with a clear contract. | Regression fixed, surrounding behavior preserved and relevant checks passed. | **Not assessed** |
+| Test engineering | Add boundary and failure-case tests. | Tests derived from requirements that detect relevant faulty behavior, not merely pass. | **Not assessed** |
+| Code review | Find regressions in a bounded change. | Known defects detected, missed defects and false positives evaluated, with connected callers considered. | **Not assessed** |
+| Diagnosis and design | Investigate an ambiguous failure or compare structural changes. | Evidence-backed hypotheses, alternatives and independently checked conclusions. | **Not assessed** |
+| Security-sensitive work | Review authorization or possible data exposure. | Dedicated domain assessment with adversarial cases; generic coding results are insufficient. | **Not assessed** |
+
+Classify the concrete task's complexity, ambiguity, dependencies, context needs
+and verification effort. Consider risk separately: a one-line authorization
+change can require more scrutiny than a larger mechanical edit. These rows are
+task guidance, not new plugin capability identifiers or a fixed agent roster.
+
+For example, a frontend label change, a state-synchronization fix and an
+authentication-boundary redesign need different demonstrations. Approval for the
+first does not establish ability for the others. Successful implementation also
+does not establish review ability. A bounded subtask can qualify without granting
+the model a broad specialist title.
+
+## Demonstrated ability versus runtime capacity
+
+| Dimension | Question it answers | Evidence to use |
+| --- | --- | --- |
+| Specialty | What knowledge and checklist does this assignment require? | The task, domain constraints and acceptance criteria. |
+| Demonstrated ability | Has this model met comparable requirements within this scope? | Matching model/version assessment results, including task type, language, complexity, context limits and failures. |
+| Runtime capacity | Can the approved model safely execute this task now? | The plugin's current admission and resource evidence. |
+
+Free memory or an idle slot does not demonstrate ability. A qualified model can
+still be temporarily busy. Neither dimension grants approval or enables routing.
+Prefer local execution only when task fit, approval, enabled routing, verification
+and runtime admission all satisfy the current plugin contract.
+
+Read Local Model Delegation's [assessment workflow](https://github.com/fcoouto/local-model-delegation/blob/main/skills/setup/SKILL.md)
+and [assessment/verification contracts](https://github.com/fcoouto/local-model-delegation/blob/main/skills/local-delegation/references/contracts.md)
+at the installed version to locate and interpret evidence. Published assessment
+cases describe what can be tested; saved per-model results establish what was
+demonstrated. Neither a fixture nor passing package unit tests proves that a model
+passed the assessment. Assessment procedures and results remain owned by the plugin.
+
+When reporting a model/task match, show the specialty and concrete scope, evidence
+source/version, observed result and limits, approval/routing state, and runtime
+availability separately. Use **Not assessed** when matching evidence is absent;
+this means unknown, not incapable. Report failed, stale or out-of-scope evidence
+explicitly rather than presenting it as a pass. No matching evidence means no
+local qualification for that task; retain authorized native execution. Do not run
+new assessments without the required consent or infer a model's level from its name.
+
+## Discover models and check capacity
+
+### Native models
+
+Inspect the active client's actual spawn tool, supported model/effort choices,
+and effective session, subagent-default and role settings. A client model catalog
+can help discover choices, but the actual spawn interface determines which are
+supported for delegation. Never copy a model list from another machine or client.
+Use a task-authorized model and reasoning effort; otherwise preserve the active
+session's settings. Where supported, set both explicitly when preservation is
+required. Where the host requires inheritance, use that supported path and inspect
+effective defaults. An omitted model is not proof of inheritance when defaults or
+roles override it. Report settings that the host cannot expose as unverified.
+
+Vibe's installer preserves existing model/effort choices. Its default limit of
+three native children is a native concurrency setting, not a local model capacity
+measurement. The hook neither discovers models nor checks the selected model.
+
+### Local models
+
+Read Local Model Delegation's [agent workflow](https://github.com/fcoouto/local-model-delegation/blob/main/skills/local-delegation/SKILL.md)
+and [task/verification contracts](https://github.com/fcoouto/local-model-delegation/blob/main/skills/local-delegation/references/contracts.md).
+They define discovery, approval scope, model capability, input limits, capacity,
+queueing, runtime support and current limitations. Vibe does not maintain copies
+of their commands, schemas, model inventories or release-specific restrictions.
+
+The links are repository entry points. For execution, use the installed plugin's
+bundled docs and command help, or the repository revision matching that release.
+Do not apply `main` instructions to an older installation without checking
+compatibility. Record the inspected version/source in the existing private setup
+record. If matching instructions or eligibility evidence are unavailable, retain
+native execution and report the gap; do not guess or upgrade implicitly.
+
+## Local proposal and native fallback workflow
+
+Follow the linked plugin workflow for submission, waiting, verification, recovery
+and fallback bookkeeping. Vibe's coordinator supplies the active project constraints,
+resolves dependencies and file ownership, verifies results, and owns integration.
+Local output remains a proposal until verified; the project's required checks
+and independent review still apply before accepting the overall change.
+
+If that workflow selects native fallback, obey the [native contract below](#native-codex-delegation-contract)
+in addition to the plugin's dispatch/reconciliation protocol. Use the permitted
+native model/effort and preserve the plugin's task identity; do not create a second
+job or bypass either contract. If a permitted native worker is unavailable, the
+coordinator retains the task and reports the limitation.
+
+## What enforces each rule
+
+The native hooks apply only when trusted, loaded and actually invoked by the
+client. **Local HTTP proposals do not invoke native subagent hooks.** Do not create
+a fake native task or force local output into the native report format.
+
+| Rule | Automated check | Coordinator must verify |
+| --- | --- | --- |
+| Native dispatch brief | `PreToolUse` checks a safe task name, bounded JSON schema and readable declaration. | Assignment agreement, freshness, useful scope, dependencies and the worker's observed read. |
+| Worker instructions | `SubagentStart` supplies the read/report procedure; it cannot veto the start. | Worker follows the scope; compare trusted task identity when available, otherwise disclose unverified binding. |
+| Native final report | `SubagentStop` checks structure and requests one correction when the retry flag permits. | Truth of changes, checks, blockers and completion. |
+| Model selection | Native client validates supported requests. Local eligibility is governed by the linked plugin contract. Vibe hooks do not check model choice. | Authorization, actual model/effort, full task fit, relevant constraints and any unavailable evidence. |
+| Writes, budgets and ownership | Native declarations have structural consistency/bounds; they are not access controls, timers or cross-worker locks. | Disjoint writers, real permissions, budgets, safe takeover, source freshness and final integration. |
+| Quality and safety | Native hooks check report structure only; local verification follows the linked plugin contract. | Semantic correctness, independent review when required, security/accessibility and destination checks. |
+
+Hook failures, untrusted definitions or unsupported client paths can leave native
+spawns unguarded. Unit tests establish handler behavior, not Desktop/VS Code
+interception. Local plugin discovery, approved-model execution, fallback and
+verification also need their own observed evidence. Neither route's evidence
+qualifies the other; do not claim end-to-end enforcement from installation alone.
+
+## See the effective policy and current work
+
+In a destination project, start at `AGENTS.md` and follow its link to
+`.codex/delegation-brief.md`. Setup must also link this guide from the project's
+existing documentation entry point; the installer does not edit those files.
+Keep a dated summary in the existing private setup/quality record: client/plugin
+versions, permitted routes, native model/effort evidence, local routing state,
+approved scopes and capacity evidence, active hook root/trust, tested behavior
+and unresolved gaps. Keep machine-specific model inventories out of this package.
+
+Users can ask: “Show this project's effective delegation policy, eligible local
+models and assessed limits, native fallback, and which controls were actually
+tested.” Answer from current evidence, marking missing information unknown.
+During work, distinguish selected route/model, waiting, verification and completion.
+For local status and visibility, follow the plugin's current workflow; missing
+evidence means unknown.
+
+## Native Codex delegation contract
 
 Use native subagents with the active client's provider, authentication and
 permissions. Inherit the coordinator's model and reasoning unless the user

@@ -53,10 +53,34 @@ unrun checks and limitations. Distinguish source, fixtures and deployment eviden
 Keep durable facts with source, verification date and invalidation triggers; keep
 temporary handoffs in the existing task record. Resume by checking actual state.
 
-Use installed relevant skills and supported native tools. Preserve the main model,
-provider, authentication and permissions. Choose supported subagent capability by
-task complexity and risk under the user's policy, or inherit session settings.
+## Delegation and models
+
+Read [the delegation policy and execution contract](.codex/delegation-brief.md)
+before choosing a route. Preserve the main model, reasoning, provider,
+authentication and permissions. Inspect actual native model/effort support and
+effective defaults; availability does not grant authorization to switch.
 Do not add a provider, proxy or paid API to enable delegation.
+
+Use the [task/specialty guide](.codex/delegation-brief.md#task-and-specialty-guide)
+to define the assignment's required ability. Match evidence to the concrete model
+and task scope; an idle runtime does not prove competence. Mark missing matching
+evidence **Not assessed**, keep approval and runtime availability separate, and
+follow the linked plugin assessment contract rather than inventing qualifications.
+
+Prefer the installed `local-model-delegation` plugin for suitable bounded tasks
+when routing is enabled, the exact model/scope is approved, the complete task fits
+assessed capability/context limits, and safe capacity is available. Follow its
+[own workflow](https://github.com/fcoouto/local-model-delegation/blob/main/skills/local-delegation/SKILL.md)
+using docs matching the installed version for discovery, execution, verification
+and fallback. Missing/disabled or ineligible local routes keep work native;
+ordinary work does not authorize new approvals or activation. Explicit user
+restrictions override this preference.
+Local models return proposals, not native subagent reports; native hooks do not
+cover their HTTP calls. The coordinator supplies constraints, verifies results
+and owns integration. Native fallback obeys both the plugin's dispatch protocol
+and the native contract below.
+Keep current route/model evidence and qualification gaps in [existing private
+setup/quality record]; link this policy from [existing documentation entry point].
 
 For post-merge cleanup, use one bounded worker on a lightweight compatible native
 model, selected from the current host without hard-coded model names. Follow the
@@ -66,8 +90,9 @@ an expensive worker. Preserve coordinator settings, authentication and permissio
 Cleanup defaults ON with opt-out; confirm all associated PRs merged, delete and
 verify remote branches first, then remove the exact worktree without force.
 
-Use native subagents when independent work, specialization or context isolation
-justifies coordination. Before spawning, write the bounded JSON declaration from
+Use authorized native subagents when native execution is selected and independent
+work, specialization or context isolation justifies coordination. Before spawning,
+write the bounded JSON declaration from
 [the delegation contract](.codex/delegation-brief.md) to
 the active harness root's `.codex-delegations/<task_name>.json`. Name that root and
 the software repository separately in the native message; use that exact task name

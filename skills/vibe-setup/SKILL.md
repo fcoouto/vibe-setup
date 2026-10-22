@@ -13,6 +13,15 @@ path. The component installer still covers only the subagent guard. Use the
 [onboarding guide](onboarding.md) and [lifecycle contract](task-lifecycle.md) for
 the helper request schemas, recovery and manual actions.
 
+Delegation follows Vibe's [policy and execution contract](delegation-brief.md).
+Prefer enabled, approved local models through the installed `local-model-delegation`
+plugin when the full task fits assessed capability and safe capacity. Otherwise
+retain authorized native execution. Preserve user restrictions; setup does not
+implicitly approve models or enable routing. Local proposals bypass native hooks
+and require coordinator verification before integration. Read the linked plugin
+workflow at the installed version for local execution; do not copy its procedures
+into Vibe or apply newer repository instructions to an older installation implicitly.
+
 ## Procedure
 
 1. **Discover.** Confirm the destination, active instructions, dirty changes,
@@ -57,11 +66,16 @@ the helper request schemas, recovery and manual actions.
    Reuse working integrations. Review this package's code/tests and follow
    [installation and trust](README.md#2-review-and-apply-the-subagent-package).
    Reconcile project instructions using [the template](AGENTS.md.template).
-   Use [bounded native delegation](delegation-brief.md), actual host controls and
-   permitted model/authentication. Keep each file under one writer. Install the
-   template's normal-task lifecycle instructions into the project's existing guide,
-   resolving the actual installed helper path. Routine tasks use those instructions
-   directly; they must not repeat complete Vibe onboarding.
+   Apply the [delegation policy](delegation-brief.md), including local eligibility,
+   task/specialty requirements, demonstrated ability versus runtime capacity,
+   model discovery, bounded native fallback and coordinator verification. Mark
+   specialties without matching model/task evidence **Not assessed**. Link it
+   from the target's existing `AGENTS.md` and documentation entry point; record
+   effective routes and qualification evidence privately. Keep each file under
+   one writer and preserve permitted model/authentication.
+   Install the template's normal-task lifecycle instructions into the project's
+   existing guide, resolving the actual installed helper path. Routine tasks use
+   those instructions directly; they must not repeat complete Vibe onboarding.
 5. **Validate.** Run project-native checks, applicable live integrations and
    disposable harness cases. Confirm the resolved project configuration layer is
    trusted and loaded before requesting hook approval; untrusted project hooks
