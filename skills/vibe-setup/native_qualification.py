@@ -148,10 +148,11 @@ def guard():
     return runpy.run_path(str(PACKAGE / ".codex/hooks/subagents.py"))
 
 
-def packet(root, name, tool):
+def packet(root, name, tool, *, legacy=False):
     skeleton = {"status": "done", "summary": "Describe the observed role, specialty, root and result.",
                 "changed_files": [], "checks": ["List actual read results."], "risks": [], "blockers": [],
-                "next_action": "Coordinator verifies native evidence and display."}
+                "next_action": ("Coordinator verifies native evidence and display." if legacy else
+                                "Coordinator verifies hooks and native dispatch evidence.")}
     args = {"task_name": name, "message": (
         f"Harness root: {root}. Read .codex-delegations/{name}.json before work. Software and command root: {root}. "
         "Read only the declared files; preserve inherited model, reasoning, provider, authentication and permissions. "
@@ -164,7 +165,8 @@ def packet(root, name, tool):
 
 def prepare(root, request, wf):
     fields(request, ("record_path", "task_name", "parent_log", "client_context", "tool", "read_paths",
-                     "protected_files", "display_required"))
+                     "protected_files"), ("display_required",))
+    request = {"display_required": False, **request}
     if type(request["display_required"]) is not bool:
         raise ValueError("display_required must be boolean")
     name = request["task_name"]
@@ -245,7 +247,10 @@ def revalidate(record, root, wf, *, before_dispatch=False):
             or not all(isinstance(item, str) for item in request["tool"]["fields"])
             or not {"task_name", "message"} <= set(request["tool"]["fields"])):
         raise ValueError("Unsupported native tool packet")
-    args, skeleton = packet(root, request["task_name"], request["tool"])
+    # Existing receipts retain their exact dispatched message across an upgrade.
+    legacy = (isinstance(record["report_skeleton"], dict)
+              and record["report_skeleton"].get("next_action") == "Coordinator verifies native evidence and display.")
+    args, skeleton = packet(root, request["task_name"], request["tool"], legacy=legacy)
     if record["native_arguments"] != args or record["report_skeleton"] != skeleton:
         raise ValueError("Prepared native arguments changed; never dispatch overrides or a rebuilt message")
     contract = guard()
@@ -445,8 +450,9 @@ def evaluate(record, request, wf):
             snapshot = read_file(display["snapshot"], wf, 16 * 1024 * 1024)
             result["evidence"].append({"path": display["snapshot"], "sha256": digest(snapshot)})
     result["complete"] = execution and protocol and (result["display_passed"] or not record["request"]["display_required"])
+    unmet = "execution, first-report or display" if record["request"]["display_required"] else "execution or first-report"
     result["next_action"] = ("Qualification passed; retain client-bound evidence." if result["complete"] else
-                             "Review unmet execution, first-report or display outcomes; this attempt is consumed.")
+                            f"Review unmet {unmet} outcomes; this attempt is consumed.")
     return result
 
 
