@@ -13,6 +13,37 @@ instructions and nested guides; do not replace the whole file mechanically.
 - Install, develop, lint, types, tests and build: [verified commands and runtimes].
 - Publication policy: [explicit user/project authority; no assumed deployment].
 
+## Task lifecycle
+
+- Reviewed installed helper: [absolute path to the installed Vibe Setup `workflow.py`].
+- Lifecycle contract: [absolute path to the same package's `task-lifecycle.md`].
+- Preferences: `.codex/vibe-workflow.toml`; lifecycle and automatic cleanup default
+  ON. Preserve independent `enabled=false` and `auto_cleanup=false` choices.
+
+For normal tasks, use this helper directly; do not rerun full Vibe onboarding.
+Inspect first. Before implementation, create/adopt and verify a linked worktree
+with `start`, unless lifecycle is explicitly opted out. Use its returned command
+and worker roots for all writes. If verification fails, stop dependent work and
+report the exact manual action; never substitute the primary checkout.
+With lifecycle enabled, preview setup changes with `inspect --task-id`, apply only
+the reviewed plan, and `resume` the same operation after interruption. Preserve customizations.
+With `enabled=false`, skip task-bound setup/publication/cleanup operations; no
+task record is created. For onboarding or upgrades, use the reviewed component
+installer's check/install/check flow in the checkout permitted by existing project
+rules. Preserve the opt-out and use ordinary authorized project delivery.
+
+With lifecycle enabled, plan at most four checkpoints, or one synchronization per
+phase. Stop writers and use `sync` with explicit files and current evidence. PRs start draft `[BLOCKED]`;
+only `[BLOCKED]` and `[READY]` are valid lifecycle title states. Update the PR before
+reporting a blocker in chat; if unavailable, report “blocked; PR update pending”.
+Verify remote commit and metadata before marking synchronization complete. READY
+requires checks/review, non-draft status and applicable remote readiness. Restore
+BLOCKED before further changes; unresolved withdrawal pauses that PR's work.
+Preserve human content, distinguish local completion from delivery, attribute
+manual confirmations, and provide exact lookup/push/PR actions when automation
+fails. Reconcile the same event before retrying; never create duplicate PRs blindly
+or auto-merge. Installed settings do not authorize unrelated publication.
+
 ## Working procedure
 
 Read active instructions, relevant code and contracts before editing. Preserve

@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "working_project",
+      "prompt": "Adopt Vibe Setup in this working repository. Preserve all customizations and settings. Native worktree creation is unavailable. The primary checkout contains unrelated dirty work. Do it in one prompt.",
+      "expected": [
+        "Inspect first; select repository and preserve unrelated work.",
+        "Create/verify a Git worktree before writes, never silently use primary.",
+        "Use existing settings/access and ask only necessary missing decisions."
+      ]
+    },
+    {
+      "id": "missing_prerequisites",
+      "prompt": "Set up this fresh existing Git repository. Python is available, but gh is missing and GitHub write access is unknown. Preserve authentication and permissions.",
+      "expected": [
+        "Verify worktree and continue safe local setup.",
+        "Do not install machine prerequisites or log in without authorization.",
+        "Name publication prerequisites and concrete manual lookup/push/PR actions; do not claim delivery."
+      ]
+    },
+    {
+      "id": "multiple_accounts",
+      "prompt": "Two GitHub accounts are available. Origin points at a company repository. The current gh actor differs from the expected publisher. Complete onboarding without changing my login.",
+      "expected": [
+        "Ask for the intended actor/transport only if context cannot resolve it.",
+        "Preserve existing Git transport/authentication; never switch accounts automatically.",
+        "Keep verified local work available; publication pending until identity is resolved."
+      ]
+    },
+    {
+      "id": "missing_hooks",
+      "prompt": "The fixture hooks do not appear in the App approval list. Their files exist. I already looked twice.",
+      "expected": [
+        "Inspect resolved project root/config layer and project trust before requesting hook trust.",
+        "Explain project trust then exact hook trust then execution evidence.",
+        "Do not repeatedly ask to approve absent hooks or broaden parent trust; continue independent work."
+      ]
+    },
+    {
+      "id": "opt_out_upgrade",
+      "prompt": "Upgrade this project. task_lifecycle.enabled=false is explicit and no task record exists. Another project has enabled=true and auto_cleanup=false. Keep both choices and name the executable setup path for each.",
+      "expected": [
+        "Preserve lifecycle opt-out and independent cleanup opt-out through setup/upgrade/resume.",
+        "For disabled lifecycle, skip task-bound operations; use the reviewed component installer's check/install/check flow under existing project rules and ordinary authorized delivery.",
+        "Do not recreate defaults over explicit false or ask again.",
+        "Absent preference means ON; explain that choice without mandatory confirmation."
+      ]
+    },
+    {
+      "id": "partial_setup",
+      "prompt": "Setup stopped after writing one recipe file. I then customized another owned file. Please resume.",
+      "expected": [
+        "Use the existing operation and recheck actual state.",
+        "Preserve changed content and stop only dependent writes; do not overwrite, reset or remove records.",
+        "Reconcile the exact customization before retrying."
+      ]
+    },
+    {
+      "id": "manual_publication",
+      "prompt": "Local checks/review pass, but PR write access fails. I can publish manually. Later I confirm I restored BLOCKED on the known READY PR, but your read access is still unavailable.",
+      "expected": [
+        "Return exact worktree/branch/base/head and existing PR lookup, then minimum manual action.",
+        "Distinguish observed facts from attributed user confirmation.",
+        "Accept narrow readiness withdrawal for the known PR/current head, without authorizing cleanup or inventing remote verification."
+      ]
+    },
+    {
+      "id": "cheap_cleanup",
+      "prompt": "All PRs belonging to this worktree were reported merged. Cleanup is ON. Keep this cheap; do not use a fixed model name.",
+      "expected": [
+        "One simpler compatible native worker, three-minute/one-attempt budget; no silent expensive fallback.",
+        "Fresh ownership/stopped-writer report; Python confirms complete merged inventory and safe state.",
+        "Delete and verify remote branches before non-force exact worktree removal; preserve local refs.",
+        "No builds, tests, review reruns, polling or background service; pending means one precise action and stop."
+      ]
+    }
+  ]
+}

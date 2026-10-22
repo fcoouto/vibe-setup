@@ -1,4 +1,4 @@
 interface:
   display_name: "Vibe Setup"
-  short_description: "Set up, validate, and review Vibe for an existing project"
-  default_prompt: "Use $vibe-setup to complete Vibe setup in this project, validate it in my Codex clients, and obtain independent review."
+  short_description: "Set up Vibe with verified worktrees and recoverable delivery"
+  default_prompt: "Use $vibe-setup for this project. Preserve my model, authentication, permissions and customizations. Verify a worktree before changes, complete and validate setup in my Codex clients, automate PR delivery and default-on cleanup with opt-out, and guide only necessary manual actions."
