@@ -7,6 +7,13 @@ operations and adds direct helper instructions for normal project tasks. The exi
 still installs only the subagent component; it does not install the helper or
 policy asset. Run the helper from the complete reviewed package.
 
+For a package update across the installed skill and selected consumers, use the
+[update transaction contract](update-contract.md). It adds private scope, recovery
+and completion records around these existing lifecycle operations. It does not
+replace verified worktree bindings, project publication authority, native trust
+controls or cleanup ownership. Native client probes use the separate
+[single-attempt qualification contract](qualification.md).
+
 ## Inspect first
 
 Run the reviewed package helper from its actual location:

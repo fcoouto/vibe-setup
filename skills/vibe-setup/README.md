@@ -75,6 +75,15 @@ An explicit file read is useful fallback evidence, not automatic discovery proof
 
 ## Complete-run contract
 
+Updates use the [scoped update transaction](update-contract.md), which joins the
+shared skill, selected project copies, local activation, client evidence and
+delivery in one private record. It freezes a complete candidate, preserves owned
+baselines/customizations, resumes interrupted writes and reports unmet outcomes.
+It does not enroll unrelated repositories or infer native trust from file hashes.
+Use the [single-attempt qualification helper](qualification.md) in each requested
+client. Actual execution, first-report validity and Habblaud display have separate
+results. A no-op needs no new writes or probes when applicable evidence is valid.
+
 The skill drives the full Prompt 12 procedure; the sections below supply the
 portable implementation details. The pinned package baseline above describes its
 origin, not a permanent upstream selection. Use a user-supplied revision or local

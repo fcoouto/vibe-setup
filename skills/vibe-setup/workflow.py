@@ -362,7 +362,8 @@ SETUP_FILES = (".codex/hooks/subagents.py", ".codex/hooks/native_display.py",
                ".codex/delegation-brief.md", ".codex/native-display.md",
                ".codex/config.toml", ".codex/hooks.json", ".gitignore", ".graphifyignore",
                ".codex/vibe-workflow.toml")
-PACKAGE_FILES = ("workflow.py", "install.py", ".codex/hooks/subagents.py", ".codex/hooks/native_display.py",
+PACKAGE_FILES = ("workflow.py", "install.py", "update_workflow.py", "native_qualification.py",
+                 ".codex/hooks/subagents.py", ".codex/hooks/native_display.py",
                  "delegation-brief.md", "native-display.md", ".codex/config.toml", ".codex/hooks.json",
                  ".codex/vibe-workflow.toml")
 
@@ -1435,7 +1436,9 @@ def unique_object(pairs: list[tuple]) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("inspect", "start", "apply", "sync", "resume"))
+    update_operations = ("plan-update", "apply-update", "resume-update", "rollback-update", "record-update", "status-update")
+    probe_operations = ("prepare-probe", "begin-probe", "record-probe", "status-probe")
+    parser.add_argument("operation", choices=("inspect", "start", "apply", "sync", "resume") + update_operations + probe_operations)
     parser.add_argument("root", type=Path, help="Selected project/source checkout")
     parser.add_argument("--client", action="append", choices=("app", "vscode"), default=[])
     parser.add_argument("--task-id", help="Include a read-only setup plan for a verified task worktree")
@@ -1455,7 +1458,13 @@ def main(argv: list[str] | None = None) -> int:
             if len(payload) > 65536:
                 raise ValueError("Request exceeds 64 KiB")
             request = json.loads(payload, object_pairs_hook=unique_object)
-            if args.operation == "start":
+            if args.operation in update_operations + probe_operations:
+                if args.client or args.task_id or args.file:
+                    raise ValueError("Update and probe operations take their explicit scope in the JSON request")
+                module = "update_workflow.py" if args.operation in update_operations else "native_qualification.py"
+                handler = runpy.run_path(str(Path(__file__).resolve().parent / module))["handle"]
+                output = handler(args.operation, args.root, request, globals())
+            elif args.operation == "start":
                 output = start_task(args.root, request)
             elif args.operation == "apply":
                 if not isinstance(request, dict) or set(request) != {"task_id", "plan"}:
@@ -1469,9 +1478,10 @@ def main(argv: list[str] | None = None) -> int:
                 if not isinstance(request, dict) or "operation_id" not in request or set(request) - {"operation_id", "confirmation", "usage"}:
                     raise ValueError("Provide operation_id, fresh lifecycle usage and optional attributed confirmation")
                 output = resume_operation(args.root, request["operation_id"], request.get("confirmation"), usage=request.get("usage"))
-    except (ValueError, OSError) as error:
+    except (ValueError, OSError, KeyError, TypeError, RecursionError) as error:
         output = result(args.operation, "blocked", "not_started", next_action=
-                        str(error) if isinstance(error, ValueError) else "Cannot inspect the selected files; verify paths and access")
+                        str(error) if isinstance(error, ValueError) else
+                        "Cannot validate the request or selected files; verify the schema, paths and access")
     print(json.dumps(output, indent=2))
     return {"ok": 0, "action_required": 2, "blocked": 3}[output["status"]]
 
