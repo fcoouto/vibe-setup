@@ -11,7 +11,8 @@ import tomllib
 SOURCE = Path(__file__).resolve().parent
 
 
-def install(target, check=False, non_git=False):
+def plan_install(target: Path, non_git: bool = False) -> dict[str, bytes]:
+    """Return the existing recipe changes without creating directories or writing files."""
     root = Path(target).resolve(strict=True)
     if not root.is_dir():
         raise ValueError("Target must be an existing project directory")
@@ -28,6 +29,8 @@ def install(target, check=False, non_git=False):
                 break
             if part.is_symlink():
                 raise ValueError("Refusing a symlink at an installer-owned destination")
+        if path.exists() and not path.is_file():
+            raise ValueError("Expected a regular file at an installer-owned destination")
         return path.read_bytes() if path.exists() else None
 
     writes = {}
@@ -96,7 +99,13 @@ def install(target, check=False, non_git=False):
         if payload != current:
             writes[relative] = payload
 
+    return writes
+
+
+def install(target, check=False, non_git=False):
     # Validate all destinations before changing any file; collisions preserve the project.
+    writes = plan_install(target, non_git=non_git)
+    root = Path(target).resolve(strict=True)
     if not check:
         for relative, payload in writes.items():
             path = root / relative

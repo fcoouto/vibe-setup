@@ -1,6 +1,6 @@
 # Vibe Setup Worktree-First Implementation Plan
 
-> **For agentic workers:** Use superpowers:executing-plans for inline execution, or superpowers:subagent-driven-development if the user chooses delegation. Track steps with checkboxes. This document records the revised scope; Phase 1 local implementation and independent review are complete; delivery is tracked in the associated PR and later phases remain unimplemented.
+> **For agentic workers:** Use superpowers:executing-plans for inline execution, or superpowers:subagent-driven-development if the user chooses delegation. Track steps with checkboxes. This document records the revised scope; Phase 1 is merged; Phase 2 local implementation, validation and independent review are complete. Phases 3–4 remain unimplemented; remote delivery is tracked in each phase PR.
 
 **Goal:** Deliver one-prompt onboarding with verified worktrees, a small Python helper, best-effort PR automation, default-on post-merge cleanup with opt-out, and concrete manual recovery.
 
@@ -12,7 +12,7 @@
 
 ## Status and global constraints
 
-The user's 2026-10-22 direction removes universal host enforcement as a release gate. Historical Phase 1 NO-GO results remain factual but do not block these new phases. No previous strict test is marked passed. Phase 1 has 55 passing tests, completed independent review and was merged through [PR #2](https://github.com/fcoouto/vibe-setup/pull/2). Phases 2–4 remain unimplemented. The post-merge cleanup requirements below are planned, not activated by this documentation update.
+The user's 2026-10-22 direction removes universal host enforcement as a release gate. Historical Phase 1 NO-GO results remain factual but do not block these new phases. No previous strict test is marked passed. Phase 1 has 55 passing tests, completed independent review and was merged through [PR #2](https://github.com/fcoouto/vibe-setup/pull/2). Phase 2 adds recoverable recipe setup with 76 passing tests and completed independent review; remote delivery is recorded in its associated PR. Phases 3–4 remain unimplemented. Post-merge cleanup remains planned, not activated by Phase 2.
 
 - Create and verify a task-owned linked worktree before repository implementation or writable delegation. If unavailable, request manual recovery and verify the result; never automatically edit the primary checkout.
 - Preserve current model, reasoning, provider, authentication, permissions, global settings and unrelated work. Do not introduce an MCP server, daemon, proxy, credential service or new Python dependency.
@@ -37,7 +37,7 @@ The user's 2026-10-22 direction removes universal host enforcement as a release 
 
 ## Baseline and files
 
-Repository: this repository. Phase 1 merged main: `897874401079d1dfd7236ec1aa385997ccb07640`, including the project-trust onboarding correction. Inspect current state before further implementation and preserve newer work.
+Repository: this repository. Phase 1 merged main: `897874401079d1dfd7236ec1aa385997ccb07640`, including the project-trust onboarding correction. Phase 2 starts from `ebcf002ffdb57bae479f616a4fc824d57e18ad86` after cleanup-plan PR #3 merged. Inspect current state before further implementation and preserve newer work.
 
 Create/reuse a verified isolated development worktree before source changes. At execution, place the approved design and plan under `docs/superpowers/specs/2026-10-22-worktree-first-onboarding-design.md` and `docs/superpowers/plans/2026-10-22-worktree-first-onboarding.md`, fixing links. Keep private qualification records local or in the project's established private evidence home.
 
@@ -48,7 +48,8 @@ Create/reuse a verified isolated development worktree before source changes. At 
 | `skills/vibe-setup/install.py` | Expose pure existing installation planning; preserve current public API/CLI |
 | `skills/vibe-setup/onboarding.md` | Prompt, prerequisites, user actions, setup/recovery and activation |
 | `skills/vibe-setup/task-lifecycle.md` | Worktree, checkpoint, PR and manual delivery contract |
-| `skills/vibe-setup/tests/test_workflow_setup.py` | Policy, inspection, worktrees and setup recovery |
+| `skills/vibe-setup/tests/test_workflow_setup.py` | Policy, inspection, worktrees and shared disposable fixture |
+| `skills/vibe-setup/tests/test_workflow_recovery.py` | Recipe setup, interrupted writes and recovery |
 | `skills/vibe-setup/tests/test_workflow_lifecycle.py` | Publication, readiness and manual reconciliation |
 | `skills/vibe-setup/tests/test_workflow_cleanup.py` | Cleanup policy, all-PR merge gate, ordered deletion and interruption recovery |
 | `skills/vibe-setup/tests/test_install.py` | Existing installer behavior and pure-planning compatibility |
@@ -79,14 +80,25 @@ Phase delivery uses a commit in the verified development worktree and one PR syn
 
 **Files:** Modify `install.py`, `tests/test_install.py`; extend `workflow.py` and setup tests; create `onboarding.md`.
 
-**Interfaces:** Add `plan_install(target: Path, non_git: bool = False) -> dict[str, bytes]`. Preserve `install(target, check=False, non_git=False) -> list[str]` and its existing CLI exit behavior. Add `apply_setup(plan: dict, task: dict) -> dict` and `resume_operation(root: Path, operation_id: str, confirmation: dict | None = None) -> dict`. Do not call the mutating installer inside the helper's separate transaction.
+**Interfaces:** Add read-only `plan_setup(task: dict, operation_id: str | None = None) -> dict` for the concrete preview. Add `plan_install(target: Path, non_git: bool = False) -> dict[str, bytes]`. Preserve `install(target, check=False, non_git=False) -> list[str]` and its existing CLI exit behavior. Add `apply_setup(plan: dict, task: dict) -> dict` and `resume_operation(root: Path, operation_id: str, confirmation: dict | None = None) -> dict`. Do not call the mutating installer inside the helper's separate transaction.
 
-- [ ] Add failing installer tests proving pure planning writes nothing, produces exactly the existing installer bytes, and preserves existing conflicts, custom hooks, model/effort settings and return behavior.
-- [ ] Add setup tests for no-op reruns, stale plan, interruptions before/after each owned write, same-plan recovery, concurrent operation lock, symlink/nonregular targets, foreign edits, customized managed files, and secret-bearing configuration collisions. Assert exact preservation rather than blanket snapshot rollback.
-- [ ] Run both targeted suites and observe failures for the missing interfaces/behavior.
-- [ ] Extract only the existing install calculation/preflight. Implement helper-owned additions and recovery with a small schema-versioned record under the Git common directory, advisory locks, durable write intent and atomic individual replacements. Validate the worktree again before mutation.
-- [ ] Implement the design's JSON output and exit codes: 0 verified requested-operation success; 2 necessary user action; 3 unsafe/invalid dependent work. Keep implementation and delivery fields separate. Add tests that inspection success never claims installation/client execution.
-- [ ] Rerun affected tests to PASS, review connected code and documentation, commit and attempt the single phase synchronization. Record any manual delivery gap accurately.
+- [x] Add failing installer tests proving pure planning writes nothing, produces exactly the existing installer bytes, and preserves existing conflicts, custom hooks, model/effort settings and return behavior.
+- [x] Add setup tests for no-op reruns, stale plan, interruptions before/after each owned write, same-plan recovery, concurrent operation lock, symlink/nonregular targets, foreign edits, customized managed files, and secret-bearing configuration collisions. Assert exact preservation rather than blanket snapshot rollback.
+- [x] Run both targeted suites and observe failures for the missing interfaces/behavior.
+- [x] Extract only the existing install calculation/preflight. Implement helper-owned additions and recovery with a small schema-versioned record under the Git common directory, advisory locks, durable write intent and atomic individual replacements. Validate the worktree again before mutation.
+- [x] Implement the design's JSON output and exit codes: 0 verified requested-operation success; 2 necessary user action; 3 unsafe/invalid dependent work. Keep implementation and delivery fields separate. Add tests that inspection success never claims installation/client execution.
+- [x] Rerun affected tests to PASS and independently review connected code and documentation. All 76 tests passed. The reviewer found one installer-timeout error-boundary gap; a failing inspect/apply/resume regression reproduced it, and the correction passed focused and full verification.
+
+Phase delivery uses a commit in the verified development worktree and one PR
+synchronization attempt. Record the remote commit, readiness and any manual
+delivery gap in that PR; local completion alone does not establish delivery.
+
+Execution scope: the existing guard recipe plus the lifecycle policy; invoke the
+helper from its complete reviewed source package. Automatic helper installation,
+skill wiring and actual App/VS Code qualification remain Phase 4. The original
+installer API/CLI remains compatible. Recovery stores hashes and modes, not
+custom configuration snapshots; changed/partial foreign state requires manual
+reconciliation. No automatic rollback or pending-plan rebase is implemented.
 
 ## Phase 3 — PR automation, readiness, post-merge cleanup and manual recovery
 

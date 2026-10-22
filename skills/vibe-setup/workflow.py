@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Read-only inspection and verified task worktrees. Python 3.11+, macOS/Linux."""
+"""Verified worktrees and recoverable project setup. Python 3.11+, macOS/Linux."""
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import runpy
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import tomllib
 from urllib.parse import urlsplit
-from uuid import UUID
+from uuid import UUID, uuid4
 
 
 def git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -218,6 +221,7 @@ def write_record(path: Path, data: dict) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+        sync_directory(path.parent)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
@@ -344,6 +348,280 @@ def _start_task(source: Path, request: dict) -> dict:
                       evidence_ref=str(record_path), next_action="Use command_cwd and worker_cwd for every task write; reverify after context changes")
 
 
+SETUP_FILES = (".codex/hooks/subagents.py", ".codex/delegation-brief.md",
+               ".codex/config.toml", ".codex/hooks.json", ".gitignore", ".graphifyignore",
+               ".codex/vibe-workflow.toml")
+PACKAGE_FILES = ("workflow.py", "install.py", ".codex/hooks/subagents.py",
+                 "delegation-brief.md", ".codex/config.toml", ".codex/hooks.json",
+                 ".codex/vibe-workflow.toml")
+
+
+def uuid_string(value) -> str:
+    if not isinstance(value, str) or str(UUID(value)) != value:
+        raise ValueError("Use a canonical UUID for the task or operation")
+    return value
+
+
+def setup_context(task: dict) -> tuple[dict, dict]:
+    if not isinstance(task, dict) or set(task) != {"task_id", "worktree"} or not isinstance(task["worktree"], str):
+        raise ValueError("Provide only task_id and the exact worktree path")
+    task_id = uuid_string(task["task_id"])
+    root = canonical(Path(task["worktree"]))
+    common = Path(repository(root)["common_dir"])
+    binding = read_record(common / "vibe-setup/tasks" / f"{task_id}.json")
+    if binding["state"] != "verified" or binding["worktree"] != str(root) or binding["common_dir"] != str(common):
+        raise ValueError("Reconcile the verified task binding before setup")
+    facts = verify_worktree(Path(binding["source"]), root, binding["branch"])
+    if git(root, "merge-base", "--is-ancestor", binding["base_commit"], "HEAD", check=False).returncode:
+        raise ValueError("Worktree no longer descends from the task base")
+    return binding, facts
+
+
+def fingerprint(path: Path) -> dict | None:
+    safe_file(path)
+    if not path.exists():
+        return None
+    return {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "mode": stat.S_IMODE(path.stat().st_mode)}
+
+
+def package_digest() -> str:
+    digest = hashlib.sha256()
+    for name in PACKAGE_FILES:
+        payload = (Path(__file__).resolve().parent / name).read_bytes()
+        digest.update(name.encode() + b"\0" + hashlib.sha256(payload).digest())
+    return digest.hexdigest()
+
+
+def setup_writes(root: Path) -> dict[str, bytes]:
+    source = Path(__file__).resolve().parent
+    installer = runpy.run_path(str(source / "install.py"))
+    try:
+        writes = installer["plan_install"](root)
+        load_policy(root)
+    except subprocess.TimeoutExpired as error:
+        raise ValueError("Installer Git inspection timed out; check local Git and retry this operation") from error
+    except ValueError as error:
+        # Parser messages can contain custom configuration values; keep them local.
+        raise ValueError("Setup conflict: review customized recipe files, policy and agent/hook settings locally") from error
+    if not (root / SETUP_FILES[-1]).exists():
+        writes[SETUP_FILES[-1]] = (source / SETUP_FILES[-1]).read_bytes()
+    return writes
+
+
+def plan_setup(task: dict, operation_id: str | None = None) -> dict:
+    """Read-only recipe preview. Hashes bind reviewed input; configuration never enters state."""
+    binding, facts = setup_context(task)
+    root = Path(binding["worktree"])
+    before = {name: fingerprint(root / name) for name in SETUP_FILES}
+    writes = setup_writes(root)
+    files = {}
+    for name, current in before.items():
+        after = {"sha256": hashlib.sha256(writes[name]).hexdigest(),
+                 "mode": current["mode"] if current else 0o600} if name in writes else current
+        files[name] = {"before": current, "after": after}
+    if before != {name: fingerprint(root / name) for name in SETUP_FILES}:
+        raise ValueError("Setup files changed during preview; inspect again")
+    return {"schema_version": 1, "operation_id": uuid_string(operation_id or str(uuid4())),
+            "binding": binding, "head": facts["head"], "package": package_digest(), "files": files}
+
+
+def validate_plan(plan: dict) -> None:
+    if (not isinstance(plan, dict) or set(plan) != {"schema_version", "operation_id", "binding", "head", "package", "files"}
+            or type(plan["schema_version"]) is not int or plan["schema_version"] != 1):
+        raise ValueError("Review an unsupported setup plan")
+    uuid_string(plan["operation_id"])
+    if not isinstance(plan["binding"], dict) or not isinstance(plan["head"], str) or not isinstance(plan["package"], str):
+        raise ValueError("Malformed setup binding or package fingerprint")
+    if not isinstance(plan["files"], dict) or set(plan["files"]) != set(SETUP_FILES):
+        raise ValueError("Setup plan must contain exactly the owned recipe paths")
+    for entry in plan["files"].values():
+        if not isinstance(entry, dict) or set(entry) != {"before", "after"} or entry["after"] is None:
+            raise ValueError("Malformed setup file state")
+        for value in entry.values():
+            if value is not None and (not isinstance(value, dict) or set(value) != {"sha256", "mode"}
+                    or not isinstance(value["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", value["sha256"])
+                    or type(value["mode"]) is not int or not 0 <= value["mode"] <= 0o7777):
+                raise ValueError("Malformed setup file fingerprint")
+
+
+def read_operation(path: Path) -> dict:
+    safe_file(path)
+    record = json.loads(path.read_text(), object_pairs_hook=unique_object)
+    if (not isinstance(record, dict) or set(record) != {"schema_version", "plan", "done", "state"}
+            or type(record["schema_version"]) is not int or record["schema_version"] != 1):
+        raise ValueError("Review incompatible setup recovery state")
+    validate_plan(record["plan"])
+    if record["plan"]["operation_id"] != path.stem or record["state"] not in ("pending", "complete"):
+        raise ValueError("Setup recovery identity or state changed")
+    changed = {name for name, entry in record["plan"]["files"].items() if entry["before"] != entry["after"]}
+    done = record["done"]
+    if (not isinstance(done, list) or any(not isinstance(name, str) for name in done)
+            or len(set(done)) != len(done) or not set(done) <= changed
+            or (record["state"] == "complete" and set(done) != changed)):
+        raise ValueError("Malformed setup recovery progress")
+    return record
+
+
+def sync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def setup_directory(path: Path) -> None:
+    canonical(path)
+    missing = []
+    parent = path
+    while not parent.exists():
+        missing.append(parent)
+        parent = parent.parent
+    for directory in reversed(missing):
+        directory.mkdir(mode=0o700)
+        sync_directory(directory.parent)
+
+
+def setup_temporary(path: Path, operation_id: str) -> Path:
+    return path.with_name(f".vibe-{operation_id}-{path.name}.tmp")
+
+
+def replace_setup_file(path: Path, payload: bytes, before: dict | None, after: dict, operation_id: str) -> None:
+    """Replace one owned file; a complete interrupted temporary file can be reused."""
+    temporary = setup_temporary(path, operation_id)
+    setup_directory(path.parent)
+    if fingerprint(temporary) is None:
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fchmod(stream.fileno(), after["mode"])
+            os.fsync(stream.fileno())
+    if fingerprint(temporary) != after:
+        raise ValueError("Interrupted temporary file differs from the plan; preserve and inspect it before resuming")
+    if fingerprint(path) != before:
+        raise ValueError("Destination changed during setup; preserve the edit and reconcile")
+    os.replace(temporary, path)
+    sync_directory(path.parent)
+
+
+def run_setup(plan: dict, task: dict, *, resume: bool) -> dict:
+    validate_plan(plan)
+    binding, facts = setup_context(task)
+    if plan["binding"] != binding or plan["head"] != facts["head"] or plan["package"] != package_digest():
+        raise ValueError("Task, HEAD or helper package changed; reconcile before applying this plan")
+    root = Path(binding["worktree"])
+    state = canonical(Path(binding["common_dir"]) / "vibe-setup")
+    records = canonical(state / "operations")
+    record_path = records / f"{plan['operation_id']}.json"
+    safe_file(record_path)
+    if not record_path.exists() and (resume or plan != plan_setup(task, plan["operation_id"])):
+        raise ValueError("Setup plan is stale or recovery intent is missing; inspect again")
+    lock_path = state / "setup.lock"
+    safe_file(lock_path)
+    with lock_path.open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        for path in records.glob("*.json"):
+            other = read_operation(path)
+            if (path != record_path and other["state"] == "pending"
+                    and other["plan"]["binding"].get("worktree") == str(root)):
+                return result("apply", "action_required", "setup_pending", evidence_ref=str(path),
+                              next_action=f"Resume pending operation {path.stem} before starting another setup")
+        previous = read_operation(record_path) if record_path.exists() else None
+        if previous and previous["plan"] != plan:
+            raise ValueError("Operation already exists with another plan; preserve and reconcile it")
+        record = previous or {"schema_version": 1, "plan": plan, "done": [], "state": "pending"}
+        # Preflight every owned path before touching any one of them.
+        current = {name: fingerprint(root / name) for name in SETUP_FILES}
+        for name, entry in plan["files"].items():
+            allowed = (entry["after"],) if name in record["done"] else (entry["before"], entry["after"])
+            if current[name] not in allowed:
+                raise ValueError("Owned files changed outside this operation; preserve and reconcile the edits")
+            temporary = fingerprint(setup_temporary(root / name, plan["operation_id"]))
+            if temporary is not None and (not previous or temporary != entry["after"] or current[name] == entry["after"]):
+                raise ValueError("Unexpected setup temporary file; preserve and inspect it locally")
+        if not previous and plan != plan_setup(task, plan["operation_id"]):
+            raise ValueError("Setup plan changed while waiting for the lock; inspect again")
+        writes = setup_writes(root)
+        for name, payload in writes.items():
+            if hashlib.sha256(payload).hexdigest() != plan["files"][name]["after"]["sha256"]:
+                raise ValueError("Installer output changed; reconcile with the original plan")
+        if record["state"] == "complete":
+            return result("apply", "ok", "setup_configured", evidence_ref=str(record_path),
+                          next_action="Recipe files verified; client trust and full onboarding remain separate")
+        setup_directory(records)
+        if not previous:
+            write_record(record_path, record)
+        changes = []
+        for name in SETUP_FILES:
+            entry = plan["files"][name]
+            binding_now, facts_now = setup_context(task)
+            if binding_now != binding or facts_now["head"] != plan["head"]:
+                raise ValueError("Worktree context changed during setup; stop and reconcile")
+            observed = fingerprint(root / name)
+            if observed != entry["after"]:
+                if observed != entry["before"] or name not in writes:
+                    raise ValueError("Owned file changed during setup; stop and reconcile")
+                replace_setup_file(root / name, writes[name], entry["before"], entry["after"], plan["operation_id"])
+                changes.append(name)
+            if entry["before"] != entry["after"] and name not in record["done"]:
+                record["done"].append(name)
+                write_record(record_path, record)
+        if any(fingerprint(root / name) != entry["after"] for name, entry in plan["files"].items()):
+            raise ValueError("Setup verification changed; preserve all edits before resuming")
+        binding_now, facts_now = setup_context(task)
+        if binding_now != binding or facts_now["head"] != plan["head"] or package_digest() != plan["package"]:
+            raise ValueError("Setup context changed before final verification; stop and reconcile")
+        record["state"] = "complete"
+        write_record(record_path, record)
+        return result("apply", "ok", "setup_configured", changes=changes, evidence_ref=str(record_path),
+                      next_action="Recipe configured only; review project trust and hooks in each client before validation")
+
+
+def setup_failure(operation: str, error: Exception, evidence: str | None = None) -> dict:
+    if isinstance(error, BlockingIOError):
+        message = "Another setup is running; retry after it finishes"
+    elif isinstance(error, OSError):
+        message = "Filesystem operation interrupted; preserve progress and resume the same operation if its record exists"
+    else:
+        message = str(error)
+    return result(operation, "action_required" if isinstance(error, OSError) else "blocked", "setup_pending",
+                  evidence_ref=evidence, next_action=message,
+                  pending_user_actions=[{"code": "reconcile_setup", "message": message}])
+
+
+def apply_setup(plan: dict, task: dict) -> dict:
+    evidence = None
+    try:
+        validate_plan(plan)
+        binding, _ = setup_context(task)
+        evidence = str(Path(binding["common_dir"]) / "vibe-setup/operations" / f"{plan['operation_id']}.json")
+        return run_setup(plan, task, resume=False)
+    except (ValueError, OSError) as error:
+        return setup_failure("apply", error, evidence)
+
+
+def resume_operation(root: Path, operation_id: str, confirmation: dict | None = None) -> dict:
+    evidence = None
+    try:
+        if confirmation is not None:
+            raise ValueError("Setup recovery accepts no confirmation overrides; reconcile changed files explicitly")
+        operation_id = uuid_string(operation_id)
+        root = canonical(root)
+        common = Path(repository(root)["common_dir"])
+        path = common / "vibe-setup/operations" / f"{operation_id}.json"
+        evidence = str(path)
+        record = read_operation(path)
+        binding = record["plan"]["binding"]
+        if binding.get("worktree") != str(root):
+            raise ValueError("Resume from the operation's exact worktree root")
+        response = run_setup(record["plan"], {"task_id": binding.get("task_id"), "worktree": str(root)}, resume=True)
+        return {**response, "operation": "resume"}
+    except (ValueError, OSError) as error:
+        return setup_failure("resume", error, evidence)
+
+
 def unique_object(pairs: list[tuple]) -> dict:
     data = {}
     for key, value in pairs:
@@ -355,18 +633,31 @@ def unique_object(pairs: list[tuple]) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("inspect", "start"))
+    parser.add_argument("operation", choices=("inspect", "start", "apply", "resume"))
     parser.add_argument("root", type=Path, help="Selected project/source checkout")
     parser.add_argument("--client", action="append", choices=("app", "vscode"), default=[])
+    parser.add_argument("--task-id", help="Include a read-only setup plan for a verified task worktree")
     args = parser.parse_args(argv)
     try:
         if args.operation == "inspect":
             output = inspect_project(args.root, args.client)
+            if args.task_id:
+                output["setup_plan"] = plan_setup({"task_id": args.task_id, "worktree": str(args.root)})
         else:
             payload = sys.stdin.read(65537)
             if len(payload) > 65536:
-                raise ValueError("Startup request exceeds 64 KiB")
-            output = start_task(args.root, json.loads(payload, object_pairs_hook=unique_object))
+                raise ValueError("Request exceeds 64 KiB")
+            request = json.loads(payload, object_pairs_hook=unique_object)
+            if args.operation == "start":
+                output = start_task(args.root, request)
+            elif args.operation == "apply":
+                if not isinstance(request, dict) or set(request) != {"task_id", "plan"}:
+                    raise ValueError("Provide task_id and the reviewed plan only")
+                output = apply_setup(request["plan"], {"task_id": request["task_id"], "worktree": str(args.root)})
+            else:
+                if not isinstance(request, dict) or set(request) != {"operation_id"}:
+                    raise ValueError("Provide operation_id only")
+                output = resume_operation(args.root, request["operation_id"])
     except (ValueError, OSError) as error:
         output = result(args.operation, "blocked", "not_started", next_action=
                         str(error) if isinstance(error, ValueError) else "Cannot inspect the selected files; verify paths and access")
