@@ -120,14 +120,14 @@ def valid_brief(brief):
             and type(budget["attempts"]) is int and 1 <= budget["attempts"] <= 5)
 
 
-def read_brief(task_name):
+def read_brief(task_name, project=PROJECT):
     if (os.name != "posix" or os.open not in os.supports_dir_fd
             or any(not hasattr(os, flag) for flag in ("O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK"))):
         raise ValueError("safe declaration open requires POSIX")
     if not isinstance(task_name, str) or not re.fullmatch(r"[a-z0-9_]{1,64}", task_name):
         raise ValueError("unsupported task name")
     # Directory-relative opens prevent traversal; nonblocking open avoids FIFO hangs.
-    directory = os.open(PROJECT / ".codex-delegations", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    directory = os.open(project / ".codex-delegations", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
         descriptor = os.open(task_name + ".json", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
                              dir_fd=directory)

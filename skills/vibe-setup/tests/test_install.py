@@ -43,6 +43,19 @@ class InstallTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             INSTALL.plan_install(self.root)
 
+    def test_native_display_asset_is_inert_until_explicitly_wired(self):
+        INSTALL.install(self.root)
+        adapter = self.root / ".codex/hooks/native_display.py"
+        self.assertEqual(adapter.read_bytes(), (ROOT / ".codex/hooks/native_display.py").read_bytes())
+        self.assertEqual((self.root / ".codex/native-display.md").read_bytes(),
+                         (ROOT / "native-display.md").read_bytes())
+        self.assertNotIn("native_display", (self.root / ".codex/hooks.json").read_text())
+        adapter.write_text("# preserved customization\n")
+        before = self.snapshot()
+        with self.assertRaises(ValueError):
+            INSTALL.install(self.root)
+        self.assertEqual(before, self.snapshot())
+
     def test_transient_declarations_excluded_without_losing_custom_rules(self):
         for name in (".gitignore", ".graphifyignore"):
             (self.root / name).write_text("custom-cache/\n")

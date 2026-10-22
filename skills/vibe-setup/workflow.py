@@ -358,11 +358,12 @@ def _start_task(source: Path, request: dict) -> dict:
                       evidence_ref=str(record_path), next_action="Use command_cwd and worker_cwd for every task write; reverify after context changes")
 
 
-SETUP_FILES = (".codex/hooks/subagents.py", ".codex/delegation-brief.md",
+SETUP_FILES = (".codex/hooks/subagents.py", ".codex/hooks/native_display.py",
+               ".codex/delegation-brief.md", ".codex/native-display.md",
                ".codex/config.toml", ".codex/hooks.json", ".gitignore", ".graphifyignore",
                ".codex/vibe-workflow.toml")
-PACKAGE_FILES = ("workflow.py", "install.py", ".codex/hooks/subagents.py",
-                 "delegation-brief.md", ".codex/config.toml", ".codex/hooks.json",
+PACKAGE_FILES = ("workflow.py", "install.py", ".codex/hooks/subagents.py", ".codex/hooks/native_display.py",
+                 "delegation-brief.md", "native-display.md", ".codex/config.toml", ".codex/hooks.json",
                  ".codex/vibe-workflow.toml")
 
 

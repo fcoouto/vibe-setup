@@ -35,6 +35,8 @@ def plan_install(target: Path, non_git: bool = False) -> dict[str, bytes]:
 
     writes = {}
     for destination, source in ((".codex/hooks/subagents.py", ".codex/hooks/subagents.py"),
+                                (".codex/hooks/native_display.py", ".codex/hooks/native_display.py"),
+                                (".codex/native-display.md", "native-display.md"),
                                 (".codex/delegation-brief.md", "delegation-brief.md")):
         payload = (SOURCE / source).read_bytes()
         current = read(destination)
