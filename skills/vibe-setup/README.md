@@ -12,6 +12,11 @@ under `skills/vibe-setup/`. Keep reusable changes in that repository and adoptio
 records in each consuming project's own documentation. The installed skill is
 self-contained and does not depend on a consuming project's checkout or policies.
 
+The source package also provides Phase 1 [task worktree inspection and startup](task-lifecycle.md)
+through `workflow.py`. It is invoked explicitly; installation, PR automation and
+automatic client integration are not implemented yet. The existing installer
+still installs only the subagent component.
+
 Source baseline: [Vibe Prompt 12 at `790a895`](https://github.com/soumatheusgomes/vibe-coding-toolkit/blob/790a895304e0c08b70a5b215c9d334f1c86b816c/docs/prompts/12-existing-project-setup.md).
 Use that complete prompt for the surrounding setup, not only this subagent package.
 On an update, resolve upstream once and record its immutable revision. Compare
@@ -225,9 +230,26 @@ accepted fences are rejected as ambiguous; unfenced JSON is not accepted.
 
 ## 3. Establish trust and actual execution
 
-Project configuration must be trusted, and each non-managed hook definition must
-be reviewed/trusted through the client's supported surface. In CLI, use `/hooks`
-to inspect the exact source, matcher, command and timeout before trusting it.
+Establish trust in this order:
+
+1. **Confirm project trust before requesting hook approval.** Inspect the selected
+   client's resolved project root and configuration-layer diagnostics. An untrusted
+   project can have its entire project configuration layer disabled, including
+   `.codex/hooks.json`; its hooks may therefore be absent from the approval list.
+   Installed files and a visible project folder do not prove discovery. If the
+   layer is disabled for lack of trust, request the necessary project-scoped trust
+   action through the client's supported flow, then reload and verify discovery.
+2. **Review the discovered hook definitions.** Confirm the exact project source,
+   matcher, command and timeout before trusting each non-managed hook. In CLI,
+   use `/hooks`; in the App or VS Code, use the native hook-review surface.
+3. **Verify invocation in that client.** Confirm an actual hook event and the
+   expected tool result using the disposable qualification cases below.
+
+If hooks are missing, check the project layer's disabled reason before asking the
+user to approve them again. Project trust and hook trust are separate prerequisites;
+neither proves execution. Preserve model, authentication and tool permissions,
+and do not broaden trust to a parent directory to make project hooks appear.
+
 Check the App and VS Code surfaces independently; do not infer their state from a CLI run or
 its bundled executable. Request a fresh chat or restart only when needed to load
 the configuration, and record the exact user intervention.

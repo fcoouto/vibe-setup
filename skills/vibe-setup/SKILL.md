@@ -36,7 +36,9 @@ subagent package. Its installer covers only the subagent component.
    Use [bounded native delegation](delegation-brief.md), actual host controls and
    permitted model/authentication. Keep each file under one writer.
 5. **Validate.** Run project-native checks, applicable live integrations and
-   disposable harness cases. Follow [client qualification](README.md#3-establish-trust-and-actual-execution).
+   disposable harness cases. Confirm the resolved project configuration layer is
+   trusted and loaded before requesting hook approval; untrusted project hooks
+   may be absent from the approval list. Follow [client qualification](README.md#3-establish-trust-and-actual-execution).
    Test safe reruns and customizations. Record installation, discovery and
    execution separately. Request necessary trust/restart/authentication actions;
    continue work independent of those blockers. Hooks are guardrails and can
