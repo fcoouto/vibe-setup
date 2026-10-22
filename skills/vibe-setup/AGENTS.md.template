@@ -25,11 +25,15 @@ Inspect first. Before implementation, create/adopt and verify a linked worktree
 with `start`, unless lifecycle is explicitly opted out. Use its returned command
 and worker roots for all writes. If verification fails, stop dependent work and
 report the exact manual action; never substitute the primary checkout.
-For setup changes, preview with `inspect --task-id`, apply only the reviewed plan,
-and `resume` the same operation after interruption. Preserve customizations.
+With lifecycle enabled, preview setup changes with `inspect --task-id`, apply only
+the reviewed plan, and `resume` the same operation after interruption. Preserve customizations.
+With `enabled=false`, skip task-bound setup/publication/cleanup operations; no
+task record is created. For onboarding or upgrades, use the reviewed component
+installer's check/install/check flow in the checkout permitted by existing project
+rules. Preserve the opt-out and use ordinary authorized project delivery.
 
-Plan at most four checkpoints, or one synchronization per phase. Stop writers and
-use `sync` with explicit files and current evidence. PRs start draft `[BLOCKED]`;
+With lifecycle enabled, plan at most four checkpoints, or one synchronization per
+phase. Stop writers and use `sync` with explicit files and current evidence. PRs start draft `[BLOCKED]`;
 only `[BLOCKED]` and `[READY]` are valid lifecycle title states. Update the PR before
 reporting a blocker in chat; if unavailable, report “blocked; PR update pending”.
 Verify remote commit and metadata before marking synchronization complete. READY

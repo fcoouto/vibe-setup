@@ -265,3 +265,9 @@ That result does not authorize edits that other project rules prohibit. Never
 disable the feature to bypass a failure. Invalid/unknown lifecycle fields stop
 startup; unrelated policy tables are left untouched. No model, authentication,
 permission or global setting is changed by this helper.
+
+With lifecycle disabled, do not call task-bound setup, synchronization or cleanup:
+there is no verified task record. Independent onboarding/upgrades use the existing
+component installer's check/install/check flow in the checkout permitted by project
+rules, preserving the opt-out. Ordinary authorized project delivery remains
+available outside this lifecycle helper.

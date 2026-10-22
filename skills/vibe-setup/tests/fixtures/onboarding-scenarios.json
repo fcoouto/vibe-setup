@@ -39,9 +39,10 @@
     },
     {
       "id": "opt_out_upgrade",
-      "prompt": "Upgrade this project. task_lifecycle.enabled=false is explicit. Another project has enabled=true and auto_cleanup=false. Keep both choices.",
+      "prompt": "Upgrade this project. task_lifecycle.enabled=false is explicit and no task record exists. Another project has enabled=true and auto_cleanup=false. Keep both choices and name the executable setup path for each.",
       "expected": [
         "Preserve lifecycle opt-out and independent cleanup opt-out through setup/upgrade/resume.",
+        "For disabled lifecycle, skip task-bound operations; use the reviewed component installer's check/install/check flow under existing project rules and ordinary authorized delivery.",
         "Do not recreate defaults over explicit false or ask again.",
         "Absent preference means ON; explain that choice without mandatory confirmation."
       ]

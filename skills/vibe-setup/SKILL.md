@@ -44,9 +44,13 @@ the helper request schemas, recovery and manual actions.
    require `implementation=worktree_verified` before edits. Creation alone does
    not move the chat: use returned command/worker directories for every write.
    Failure stops dependent implementation; never silently use the primary checkout.
-   Preview setup with `inspect --task-id`, apply the exact reviewed plan with
-   `apply`, and use the existing operation ID with `resume` after interruption.
+   With lifecycle enabled, preview setup with `inspect --task-id`, apply the exact
+   reviewed plan with `apply`, and use the existing operation ID with `resume` after interruption.
    Preserve conflicting customizations instead of forcing a rerun.
+   With `enabled=false`, no task binding exists: skip task-bound setup,
+   publication and cleanup operations. Use the reviewed component installer's
+   check/install/check flow in the checkout allowed by existing project rules;
+   preserve the opt-out and follow ordinary authorized project delivery.
    Execute the approved complete plan: context and agreements,
    applicable tools/skills, native delegation, compatible quality improvements,
    security review procedure, memory, recovery and measured harness improvement.
@@ -74,8 +78,8 @@ the helper request schemas, recovery and manual actions.
 7. **Deliver.** Reconcile every requirement/catalog row with evidence. Update
    canonical setup/quality documentation and maintenance triggers. Report changes,
    checks, review coverage, limits, pending interventions and next action.
-   Publish under the target's actual authorization/readiness policy using `sync`: no
-   more than four planned unphased checkpoints, or one synchronization per phase.
+   When lifecycle is enabled, publish under the target's actual authorization and
+   readiness policy using `sync`: no more than four planned unphased checkpoints, or one synchronization per phase.
    Stop writers before snapshotting. Create PRs draft with `[BLOCKED]`, preserve
    human content, and verify remote head/metadata before claiming synchronization.
    Blockers stop implementation: update the PR before chat; if that fails, report

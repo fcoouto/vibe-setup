@@ -59,6 +59,14 @@ Explain that cleanup is ON by default and can be disabled independently. Do not
 force a preference question or ask again after an explicit choice. Cleanup runs
 once after observed merges, never as a background monitoring service.
 
+An explicit `enabled=false` bypasses task-bound helper operations, including
+`inspect --task-id`, `apply`, `sync` and lifecycle `resume`: startup creates no
+task record. Independent onboarding and upgrades still use the reviewed component
+installer's [check/install/check flow](README.md#2-review-and-apply-the-subagent-package)
+in the checkout allowed by existing project rules. Keep the opt-out untouched and
+follow ordinary authorized project delivery. Never enable lifecycle to make
+the task-bound recipe run.
+
 During onboarding, adapt the template's normal-task instructions into the existing
 project guide with the actual installed helper/contract paths. Preserve unrelated
 instructions and nested guides. This is separate from the seven-file setup recipe;
@@ -75,7 +83,8 @@ through those project instructions instead of invoking full onboarding again.
 
 ## Preview, apply, resume
 
-First follow [task startup](task-lifecycle.md) and retain the verified task UUID.
+For enabled lifecycle, follow [task startup](task-lifecycle.md) and retain the
+verified task UUID.
 Use the canonical worktree root returned by startup, not the primary checkout.
 For clarity, the examples below use `/path/to/vibe-setup` for the reviewed package
 and `/absolute/task-worktree` for the verified target. Substitute actual paths.

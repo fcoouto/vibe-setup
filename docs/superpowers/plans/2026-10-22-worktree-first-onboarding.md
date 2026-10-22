@@ -135,10 +135,36 @@ Implementation evidence: all 120 tests passed, including original installer/setu
 - [x] Integrate the five operations into the full setup skill and normal task instructions. Keep command/worker roots explicit. Explain local completion versus delivery, actual product blockers, manual handoff, project trust before hook trust and activation in the exercised checkout.
 - [x] Expose the automatic-cleanup preference during onboarding and document that it defaults ON. Reuse explicit choices without asking again. Confirm all associated PRs merged before automatic remote-branch deletion and subsequent local-worktree removal; report pending recovery without changing merge status.
 - [x] Run `python3 -B -m unittest discover -s skills/vibe-setup/tests -v` and `git diff --check`; require relevant tests to PASS. Validate the skill package with existing tooling without installing global dependencies.
-- [ ] In disposable actual App and VS Code sessions, verify discovery, task worktree startup, worker directory, safe rerun, one phase synchronization, a controlled publication failure and manual/resume behavior. Qualify cleanup opt-out, all-PR confirmation, ordered deletion and recovery from each client's supported worktree lifecycle. Preserve model/authentication/permissions. Do not require native denial of every alternative tool or repeat the rejected universal-enforcement experiment.
-- [ ] Obtain independent read-only review of the exact diff, source coverage, worktree checks, access behavior, recovery, human-content preservation and user-facing claims. Fix confirmed issues and rerun affected checks.
-- [ ] Attempt final PR synchronization. Keep `[BLOCKED]` until confirmed non-draft status and applicable readiness requirements are established; then apply/verify `[READY]` or give the user exact manual promotion steps with remaining checks and any pending “Ready for review” action explicit. Never merge automatically or claim publication complete while pending.
-- [ ] When installation is authorized, preserve the previous installed package, reconcile customizations, update the reviewed files and verify hashes/discovery/execution. State the checkout and clients actually activated. Missing permissions or user actions remain named pending steps, not a hidden downgrade.
+- [x] In disposable actual App and VS Code sessions, verify discovery, task worktree startup, worker directory, safe rerun, one phase synchronization, a controlled publication failure and manual/resume behavior. Qualify cleanup opt-out, all-PR confirmation, ordered deletion and recovery from each client's supported worktree lifecycle. Preserve model/authentication/permissions. Do not require native denial of every alternative tool or repeat the rejected universal-enforcement experiment.
+- [x] Obtain independent read-only review of the exact diff, source coverage, worktree checks, access behavior, recovery, human-content preservation and user-facing claims. Fix confirmed issues and rerun affected checks.
+- [x] Attempt PR synchronization (PR #6 created and verified as `[BLOCKED]` for the client-trust blocker). Keep `[BLOCKED]` until confirmed non-draft status and applicable readiness requirements are established; then apply/verify `[READY]` or give the user exact manual promotion steps with remaining checks and any pending “Ready for review” action explicit. Never merge automatically or claim publication complete while pending.
+- [x] When installation is authorized, preserve the previous installed package, reconcile customizations, update the reviewed files and verify hashes/discovery/execution. State the checkout and clients actually activated. Missing permissions or user actions remain named pending steps, not a hidden downgrade.
+
+Qualification evidence (2026-10-22): all 120 package tests passed; eight bounded
+onboarding decision cases passed. Independent review found one lifecycle-opt-out
+routing gap. Corrected instructions now use the existing component installer when
+no lifecycle task record exists; a disposable runtime check preserved both false
+settings, and a fresh decision test chose the executable paths correctly.
+
+| Native client surface | Verified scope |
+| --- | --- |
+| App native worker, host 26.1013.40934 (20770) | Installed skill discovery/read, verified Git worktree and actual child command root, setup/apply/resume/no-change rerun; 12 local transport fixtures. |
+| VS Code 1.143.0, Codex extension 26.1007.21434 | Skill picker/catalog/read, verified Git worktree and actual coordinator/child command roots, setup/apply/resume/no-change rerun; the same 12 transport fixtures. |
+
+The user trusted only the prepared VS Code source fixture before its extension
+became available. Model/provider/reasoning and tool permissions were preserved;
+authentication and VS Code settings hashes stayed identical. Project trust entries
+added by the hosts were isolated from other configuration changes. The previous
+installed skill was backed up; all 20 installed files match the reviewed package.
+
+Qualification covers the Git worktree path through native clients. The destructive
+publication/failure/cleanup cases use real disposable Git with deterministic GitHub
+responses, not live-provider proof. This task's PR publication and the observed
+post-merge cleanup of PR #5 are separate live evidence. Native managed-worktree
+removal still requires its host action. Standalone App project-window hook loading
+and new hook approvals were not exercised; the guard/runtime code is unchanged.
+Final phase completion follows verified PR synchronization and readiness, recorded
+by the lifecycle receipt and PR state, never inferred from these local checks.
 
 ## Self-review and handoff
 
@@ -148,4 +174,4 @@ The cleanup extension remains within Phase 3 and Phase 4 qualification. Its defa
 
 Independent read-only review found one draft-state gap. The design and readiness tests now distinguish leaving draft for review from `[READY]` for merge, including failure and manual recovery of that transition.
 
-Recommended execution remains inline in one verified development worktree with independent reviews at consequential boundaries. This avoids parallel writers over the shared helper and local state. Phases 1 and 2 are merged. Phase 3 implementation is verified; delivery is tracked by its PR state. Phase 4 integration is implemented and package checks pass; actual client qualification and final review/delivery remain pending. No further search for perfect native enforcement is required by the current scope.
+Recommended execution remains inline in one verified development worktree with independent reviews at consequential boundaries. This avoids parallel writers over the shared helper and local state. Phases 1–3 are merged. Phase 4 integration, bounded native-client qualification and independent review are verified; delivery is tracked by its PR state. No further search for perfect native enforcement is required by the current scope.
