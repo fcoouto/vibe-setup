@@ -137,6 +137,10 @@ the model a broad specialist title.
 ## Role visibility in Habblaud
 
 Role declarations guide agents; they do not automatically populate a dashboard.
+The optional [native display adapter](native-display.md) forwards a bound assignment
+role through the existing Habblaud hook when native `agent_role` is absent or null.
+It preserves any supplied native role and does not change Habblaud or execution
+settings. Installation and live delivery require separate qualification.
 Keep Habblaud unchanged and qualify its existing input path separately. Inspection
 and disposable source/DOM probes against Habblaud 1.0.3
 ([`faa1a012`](https://github.com/marmottajr/habblaud/tree/faa1a012b5fbf632c66dc6801c5383e53a542406))
@@ -158,8 +162,9 @@ not delivery from every Codex client or a live Docker/Node installation.
 Inspect the active client's actual spawn schema. A native `agent_type` may select
 a configuration profile with different models or permissions; never use one just
 to obtain a badge. When a client exposes no independent role metadata field,
-retain the role in the declaration/instructions and report badge delivery as
-unsupported or unverified. Do not invent spawn parameters, rewrite session logs,
+retain the role in the declaration/instructions. The optional adapter can supply
+the missing display label; without observed delivery, report it as unverified.
+Do not invent spawn parameters, rewrite session logs,
 change native profiles or emit synthetic workers to conceal that limitation.
 
 Native and local workers use the same display format:

@@ -13,6 +13,7 @@ The [delegation policy and execution contract](delegation-brief.md) explains
 [roles alongside specialties](delegation-brief.md#role-and-specialty),
 [task/specialty requirements](delegation-brief.md#task-and-specialty-guide),
 [Habblaud badge compatibility](delegation-brief.md#role-visibility-in-habblaud),
+[optional native display adapter](native-display.md),
 [demonstrated ability versus runtime capacity](delegation-brief.md#demonstrated-ability-versus-runtime-capacity),
 [local-first route selection](delegation-brief.md#choose-the-execution-route),
 [model discovery and capacity](delegation-brief.md#discover-models-and-check-capacity),
@@ -205,6 +206,9 @@ The initial check exits 1 when files need installation; 0 means unchanged; 2 mea
 an error or a conflict requiring review. Installation creates only these paths:
 
 - `.codex/hooks/subagents.py`: bounded standard-library event handler.
+- `.codex/hooks/native_display.py`: inert optional Habblaud display adapter;
+  [explicit integration](native-display.md) is separate from guard installation.
+- `.codex/native-display.md`: setup, rollback and qualification instructions for that adapter.
 - `.codex/delegation-brief.md`: user-readable policy and native hook contract.
 - `.codex/hooks.json`: merged event groups; unrelated hooks remain intact.
 - `.gitignore` and `.graphifyignore`: preserve other entries and place the

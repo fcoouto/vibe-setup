@@ -69,7 +69,7 @@ class RecoveryTests(WorkflowFixture):
         self.assertEqual(applied["status"], "ok", applied)
         self.assertEqual(applied["implementation"], "setup_configured")
         self.assertEqual(applied["delivery"], "not_checked")
-        self.assertEqual(len(applied["changes"]), 7)
+        self.assertEqual(len(applied["changes"]), 9)
         first = self.snapshot(self.home)
         self.assertEqual(self.apply(plan)["status"], "ok")
         self.assertEqual(self.resume(plan)["status"], "ok")
