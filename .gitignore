@@ -5,4 +5,6 @@ __pycache__/
 .env
 .env.*
 graphify-out/
+/.codex/config.toml
+/AGENTS.override.md
 .codex-delegations/
