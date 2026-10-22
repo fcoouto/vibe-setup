@@ -162,18 +162,33 @@ retain the role in the declaration/instructions and report badge delivery as
 unsupported or unverified. Do not invent spawn parameters, rewrite session logs,
 change native profiles or emit synthetic workers to conceal that limitation.
 
+Native and local workers use the same display format:
+`<Role> · <Model Display Name>`, for example `Reviewer · Qwen3.8 27B Splash`.
+Use the explicit assignment role and the human-readable name of the actual
+attempt's model: display `Qwen3.8 27B Splash`, not `qwen3.8-27b-splash`. Prefer
+existing model display metadata; otherwise format the actual model identifier
+for display without changing its stored identity or selection. Do not add a
+`LOCAL` marker, provider, route or specialty to the badge. Keep role and specialty
+separate in assignment metadata. For legacy assignments without a role, display
+`Unspecified role`; this is a display placeholder, not a stored role value.
+Do not infer the role from the model name or execution route.
+
 For local workers, the plugin owns the existing-hook adapter and sends the full
 display label on the first observation of the real attempt. Pass the canonical
-role and specialty separately to that adapter. A compatible display convention
-is `LOCAL · <Role> · <actual model> · <short specialty>`: prioritize the local
-marker, role and actual model, abbreviating or omitting specialty from the badge
-first. Keep full specialty in the assignment metadata. Habblaud can visually
-ellipsize long badges from the right; hover text retains the full hook label.
-Do not send this long composite through the 40-character native rollout path or
-present a truncated model name as verified identity.
+role and specialty separately to that adapter. Keep the complete values in the
+assignment metadata: Habblaud can visually ellipsize long badges from the right,
+and native rollout parsing has the 40-character limit above. Hover text retains
+the full hook label. These transport limits do not authorize a different label
+format for local and native workers.
 
-Existing hooks still attach local characters to the Codex provider/account and
-ignore the hook's `model` field. Stop, interruption and expired hook presence can
+Native session data can also populate the agent's **Stats > Model** field.
+The existing Codex hook endpoint ignores the event's `model` field, so hook-only
+local workers cannot populate it through that path. Keep Habblaud unchanged and
+report local model Stats as unavailable; the badge's model display name does not
+establish Stats support. Do not fabricate native session data to fill that field.
+
+Existing hooks still attach local characters to the Codex provider/account.
+Stop, interruption and expired hook presence can
 look like successful completion. A role label does not fix these identity or
 lifecycle limitations; the plugin must document them and own transport testing.
 Vibe neither installs that adapter nor changes local routing. Coordinator badge
