@@ -29,6 +29,10 @@ and separate specialty. Prefer local execution only when enabled routing, existi
 approval, matching assessment evidence and safe capacity permit the complete task.
 Otherwise retain authorized native execution. Unknown roles are rejected; a custom,
 nonempty specialty is allowed but remains **Not assessed** without matching evidence.
+The adopted `[worker_selection]` policy authorizes the Coordinator to choose
+worker model/effort by task difficulty and scoped evidence, with qualified local
+models preferred, while keeping Coordinator settings unchanged. See the policy's
+eligibility, recovery and measurement gates; extra benchmarks need separate authority.
 Role labels never select a native profile or change model, reasoning, provider,
 authentication or permissions. Preserve these settings and all explicit user limits.
 The [optional native display adapter](.codex/native-display.md) only fills absent

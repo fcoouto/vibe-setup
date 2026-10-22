@@ -81,6 +81,23 @@ class NativeQualificationTests(unittest.TestCase):
         self.assertEqual(begun["status"], "ok")
         return begun
 
+    def select_worker(self):
+        self.request["tool"]["fields"].append("reasoning_effort")
+        self.request["display_required"] = False
+        self.request["worker_selection"] = {
+            "model": "selected-model", "reasoning_effort": "low",
+            "authorization": "user-approved selection probe",
+            "supported_pairs": [{"model": "selected-model", "reasoning_effort": "low"}]}
+
+    def completed_selected(self):
+        turn_id = str(uuid4())
+        request = self.completed(settings={**self.settings, "turn_id": turn_id, "root_turn_id": turn_id,
+                                           "model": "selected-model", "effort": "low"})
+        rows = [json.loads(line) for line in self.child.read_text().splitlines()]
+        rows.insert(1, {"type": "event_msg", "payload": {"type": "task_started", "turn_id": turn_id}})
+        self.child.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+        return request
+
     def completed(self, report=None, settings=None):
         self.append(self.parent, "response_item", {"type": "function_call", "name": "spawn_agent",
             "namespace": "collaboration", "call_id": "call1", "arguments": json.dumps(
@@ -114,6 +131,210 @@ class NativeQualificationTests(unittest.TestCase):
         self.assertEqual(set(result["report_skeleton"]), set(self.report))
         self.assertEqual(result["specialty_assessment"], "Not assessed")
 
+    def test_selected_packet_uses_authorized_pair_and_fresh_context(self):
+        self.select_worker()
+        args = self.prepare_begin()["native_arguments"]
+        self.assertEqual(args["model"], "selected-model")
+        self.assertEqual(args["reasoning_effort"], "low")
+        self.assertEqual(args["fork_turns"], "none")
+        self.assertNotIn("preserve inherited model", args["message"])
+
+    def test_selection_rejects_missing_authorization_unsupported_pairs_and_tool_fields(self):
+        self.select_worker()
+        for change in ("authorization", "model", "reasoning_effort", "supported_pairs", "tool"):
+            with self.subTest(change=change):
+                request = copy.deepcopy(self.request)
+                if change == "tool":
+                    request["tool"]["fields"].remove("reasoning_effort")
+                elif change == "supported_pairs":
+                    request["worker_selection"][change] = []
+                else:
+                    request["worker_selection"][change] = "" if change == "authorization" else "unsupported"
+                with self.assertRaises(ValueError):
+                    self.call("prepare-probe", request)
+                self.assertFalse(self.record.exists())
+
+    def test_selection_receipt_binds_authorization_inventory_and_arguments(self):
+        self.select_worker()
+        self.call("prepare-probe", self.request)
+        original = json.loads(self.record.read_text())
+        for change in ("authorization", "supported_pairs", "model"):
+            with self.subTest(change=change):
+                record = copy.deepcopy(original)
+                if change == "model":
+                    record["native_arguments"]["model"] = "different-model"
+                else:
+                    record["request"]["worker_selection"][change] = (
+                        "new approval" if change == "authorization" else [])
+                self.record.write_text(json.dumps(record))
+                with self.assertRaises(ValueError):
+                    self.call("begin-probe")
+
+    def test_selected_fresh_worker_is_verified_for_each_actual_client_originator(self):
+        self.select_worker()
+        for client, originator in (("app", "codex_work_desktop"), ("vscode", "codex_vscode")):
+            with self.subTest(client=client):
+                self.record.unlink(missing_ok=True)
+                self.child.unlink(missing_ok=True)
+                parent_rows = [json.loads(line) for line in self.parent.read_text().splitlines()][:2]
+                parent_rows[0]["payload"]["originator"] = originator
+                self.parent.write_text("\n".join(json.dumps(row) for row in parent_rows) + "\n")
+                context = json.loads(self.context.read_text())
+                context["client"] = client
+                self.context.write_text(json.dumps(context))
+                self.prepare_begin()
+                request = self.completed_selected()
+                child_rows = [json.loads(line) for line in self.child.read_text().splitlines()]
+                child_rows[0]["payload"]["originator"] = originator
+                self.child.write_text("\n".join(json.dumps(row) for row in child_rows) + "\n")
+                result = self.call("record-probe", request)
+                self.assertTrue(result["complete"])
+                self.assertTrue(result["selection_verified"])
+                self.assertTrue(result["coordinator_settings_preserved"])
+                self.assertEqual(result["requested_worker_settings"]["model"], "selected-model")
+                self.assertEqual(result["observed_worker_settings"][0]["effort"], "low")
+
+    def test_inheritance_is_never_reported_as_explicit_selection(self):
+        self.request["display_required"] = False
+        self.prepare_begin()
+        result = self.call("record-probe", self.completed())
+        self.assertTrue(result["complete"])
+        self.assertFalse(result["selection_verified"])
+        self.assertTrue(result["coordinator_settings_preserved"])
+
+    def test_selected_worker_cannot_drift_model_effort_provider_or_permissions(self):
+        self.select_worker()
+        self.prepare_begin()
+        request = self.completed_selected()
+        original = self.child.read_text()
+        for key, value in (("model", "inherited-model"), ("effort", "high"),
+                           ("approval_policy", "on-request"), ("sandbox_policy", {"type": "read-only"}),
+                           ("permission_profile", "different"), ("model_provider", "other")):
+            with self.subTest(key=key):
+                rows = [json.loads(line) for line in original.splitlines()]
+                if key == "model_provider":
+                    rows[0]["payload"][key] = value
+                else:
+                    changed = copy.deepcopy(rows[2])
+                    changed["payload"][key] = value
+                    rows.append(changed)
+                self.child.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+                result = self.call("record-probe", request)
+                self.assertFalse(result["selection_verified"])
+                self.assertFalse(result["complete"])
+
+    def test_selected_fresh_history_requires_native_own_turn_identity(self):
+        self.select_worker()
+        self.prepare_begin()
+        request = self.completed_selected()
+        original = self.child.read_text()
+        for change in ("missing_start", "parent_turn", "missing_parent"):
+            with self.subTest(change=change):
+                rows = [json.loads(line) for line in original.splitlines()]
+                if change == "missing_start":
+                    rows.pop(1)
+                elif change == "parent_turn":
+                    rows[1]["payload"]["turn_id"] = self.turn
+                    rows[2]["payload"]["turn_id"] = self.turn
+                else:
+                    rows[0]["payload"].pop("parent_thread_id")
+                    rows[0]["payload"]["source"] = {}
+                self.child.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+                with self.assertRaises(ValueError):
+                    self.call("record-probe", request)
+
+    def test_parent_settings_must_remain_unchanged_across_all_intervening_turns(self):
+        self.select_worker()
+        self.prepare_begin()
+        request = self.completed_selected()
+        self.append(self.parent, "turn_context", {**self.settings, "turn_id": str(uuid4()), "effort": "low"})
+        self.append(self.parent, "turn_context", {**self.settings, "turn_id": str(uuid4())})
+        result = self.call("record-probe", request)
+        self.assertFalse(result["coordinator_settings_preserved"])
+        self.assertFalse(result["complete"])
+
+    def test_cached_selection_cannot_hide_later_coordinator_setting_changes(self):
+        self.select_worker()
+        self.prepare_begin()
+        self.assertTrue(self.call("record-probe", self.completed_selected())["complete"])
+        self.append(self.parent, "turn_context", {**self.settings, "turn_id": str(uuid4()), "model": "changed"})
+        self.append(self.parent, "turn_context", {**self.settings, "turn_id": str(uuid4())})
+        with self.assertRaises(ValueError):
+            self.call("status-probe")
+
+    def test_cached_selection_rejects_appended_child_settings_drift_even_after_restoration(self):
+        self.select_worker()
+        self.prepare_begin()
+        request = self.completed_selected()
+        self.assertTrue(self.call("record-probe", request)["selection_verified"])
+        original = self.child.read_text()
+        settings = {**self.settings, "turn_id": str(uuid4()), "model": "selected-model", "effort": "low"}
+        for key, value in (("model", "different-model"), ("effort", "high"), ("approval_policy", "on-request")):
+            with self.subTest(key=key):
+                self.child.write_text(original)
+                self.append(self.child, "turn_context", {**settings, key: value})
+                self.append(self.child, "turn_context", settings)
+                with self.assertRaisesRegex(ValueError, "Worker settings changed"):
+                    self.call("status-probe")
+
+    def test_cached_selection_accepts_appended_matching_turns_without_rewriting_receipt(self):
+        self.select_worker()
+        self.prepare_begin()
+        self.call("record-probe", self.completed_selected())
+        original = self.record.read_bytes()
+        self.append(self.child, "turn_context", {**self.settings, "turn_id": str(uuid4()),
+                                                "model": "selected-model", "effort": "low"})
+        result = self.call("status-probe")
+        self.assertTrue(result["complete"])
+        self.assertTrue(result["selection_verified"])
+        self.assertEqual(self.record.read_bytes(), original)
+
+    def test_legacy_inherited_cache_needs_no_selection_fields_and_ignores_inherited_history(self):
+        self.request["display_required"] = False
+        self.prepare_begin()
+        request = self.completed()
+        rows = [json.loads(line) for line in self.child.read_text().splitlines()]
+        rows.insert(1, {"type": "turn_context", "payload": {**self.settings, "model": "older-parent-model"}})
+        self.child.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+        self.assertTrue(self.call("record-probe", request)["complete"])
+        record = json.loads(self.record.read_text())
+        for key in ("selection_verified", "coordinator_settings_preserved", "requested_worker_settings",
+                    "observed_worker_settings"):
+            record["result"].pop(key)
+        self.record.write_text(json.dumps(record))
+        self.append(self.child, "turn_context", {**self.settings, "turn_id": str(uuid4())})
+        self.assertTrue(self.call("status-probe")["complete"])
+        self.append(self.child, "turn_context", {**self.settings, "turn_id": str(uuid4()), "effort": "low"})
+        with self.assertRaisesRegex(ValueError, "Worker settings changed"):
+            self.call("status-probe")
+
+    def test_selected_worker_read_evidence_before_own_turn_does_not_count(self):
+        self.select_worker()
+        self.prepare_begin()
+        request = self.completed_selected()
+        rows = [json.loads(line) for line in self.child.read_text().splitlines()]
+        reads = rows[3:-1]
+        rows = rows[:1] + reads + rows[1:3] + rows[-1:]
+        self.child.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+        result = self.call("record-probe", request)
+        self.assertFalse(result["execution_passed"])
+        self.assertFalse(any(result["read_results"].values()))
+
+    def test_selected_encrypted_dispatch_capture_cannot_hide_effort_override(self):
+        self.select_worker()
+        self.prepare_begin()
+        request = self.completed_selected()
+        rows = [json.loads(line) for line in self.parent.read_text().splitlines()]
+        call = rows[-2]["payload"]
+        expected = json.loads(call["arguments"])
+        call["arguments"] = json.dumps({**expected, "message": "gAAAAencrypted", "reasoning_effort": "high"})
+        self.parent.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+        capture = self.home / "dispatch.json"
+        capture.write_text(json.dumps({"call_id": "call1", "tool": "collaboration.spawn_agent",
+            "arguments": expected, "observed_via": "native-tool-call", "source_ref": "fixture invocation call1"}))
+        result = self.call("record-probe", {**request, "dispatch_evidence": str(capture)})
+        self.assertFalse(result["selection_verified"])
+        self.assertFalse(result["complete"])
     def test_default_upgrade_qualifies_native_dispatch_without_a_display_consumer(self):
         self.request.pop("display_required")
         self.call("prepare-probe", self.request)
@@ -146,6 +367,26 @@ class NativeQualificationTests(unittest.TestCase):
         begun = self.call("begin-probe")
         self.assertEqual(begun["native_arguments"], record["native_arguments"])
         self.assertTrue(self.call("record-probe", self.completed())["complete"])
+
+    def test_legacy_selected_packet_and_cached_receipt_remain_compatible(self):
+        self.select_worker()
+        self.call("prepare-probe", self.request)
+        record = json.loads(self.record.read_text())
+        old = "Coordinator verifies native evidence and display."
+        current = record["report_skeleton"]["next_action"]
+        record["report_skeleton"]["next_action"] = old
+        record["native_arguments"]["message"] = record["native_arguments"]["message"].replace(current, old)
+        self.record.write_text(json.dumps(record))
+        self.assertEqual(self.call("begin-probe")["native_arguments"], record["native_arguments"])
+        self.assertTrue(self.call("record-probe", self.completed_selected())["complete"])
+        original = self.record.read_bytes()
+        self.append(self.child, "event_msg", {"type": "task_complete"})
+        self.assertTrue(self.call("status-probe")["selection_verified"])
+        self.assertEqual(self.record.read_bytes(), original)
+        self.append(self.child, "turn_context", {**self.settings, "turn_id": str(uuid4()),
+                                                "model": "selected-model", "effort": "medium"})
+        with self.assertRaisesRegex(ValueError, "Worker settings changed"):
+            self.call("status-probe")
 
     def test_public_cli_prepares_a_packet_and_rejects_unknown_request_fields(self):
         command = [sys.executable, "-B", str(PACKAGE / "workflow.py"), "prepare-probe", str(self.root)]

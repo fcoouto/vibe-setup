@@ -69,8 +69,46 @@ Use the actual native tool's name and available fields. The helper rejects a too
 without top-level `task_name` and `message`, wrong host root, ambiguous guard,
 invalid declaration or stale source. It emits `native_arguments` containing the
 task name, one declaration pointer and the exact seven-field report skeleton.
-It emits no model, reasoning, provider, authentication, permission or profile
-override. Authentication is not read from credential stores.
+By default it emits no model, reasoning, provider, authentication, permission or
+profile override. Authentication is not read from credential stores. Existing
+inherited probes and their receipts remain compatible.
+
+### Qualify explicit worker selection
+
+To test an authorized worker model/effort choice, add `worker_selection` to the
+preparation request. Use exact pairs observed from the current native host, and
+retain that observation with the approval reference in private evidence:
+
+```json
+{
+  "worker_selection": {
+    "model": "observed-worker-model",
+    "reasoning_effort": "low",
+    "authorization": "reference to the user's approval for this client probe",
+    "supported_pairs": [
+      {"model": "observed-worker-model", "reasoning_effort": "low"}
+    ]
+  }
+}
+```
+
+The actual `tool.fields` must include `task_name`, `message`, `model`,
+`reasoning_effort`, and `fork_turns`. The helper rejects an unsupported exact
+pair, absent authorization, or missing native control. The returned packet sets
+the selected `model` and `reasoning_effort`, with `fork_turns: "none"`. It changes
+no Coordinator settings. Authorization and supported pairs are external
+observations: validating their structure does not establish their truth, model
+competence, or ordinary-work eligibility. The Coordinator verifies those sources.
+Do not change the prepared selection, approval reference, inventory, or packet
+after preparation; revalidation rejects inconsistent receipts.
+
+For each requested client, choose a worker model and effort different from the
+Coordinator to demonstrate both controls. A matching inherited default cannot
+prove a change took effect. Use separate real App and VS Code attempts and retain
+their actual originator, parent/child identities and runtime versions. Unsupported
+client controls remain an explicit gap; CLI evidence is no substitute. This probe
+qualifies dispatch controls only. Capability qualification and savings require
+their own task evidence under the [delegation policy](delegation-brief.md).
 
 `display_required` is optional and defaults to `false`. Standard upgrades omit
 it and the update plan's `display` layer. Only an explicit user request for a
@@ -106,6 +144,15 @@ sandbox or proof against arbitrary concealed shell side effects. Inherited trans
 child execution. It supports the package's tested Codex JSONL event shapes;
 unrecognized layouts remain unqualified.
 
+For a selected worker's fresh history, the native session metadata must bind the
+child to the dispatched parent, task name, root and creation time. The first
+child turn must match an earlier native `task_started` event, and no child turn
+may reuse an observed parent turn identity. Evidence before that first child turn
+does not count as child execution. Every child turn must retain the requested
+model/effort and the Coordinator's provider and permission settings. Every
+observed Coordinator turn after dispatch must preserve its original settings;
+a temporary change followed by restoration still fails preservation.
+
 ```json
 {
   "record_path": "/private/update/app-probe.json",
@@ -128,10 +175,17 @@ must match the prepared packet. Without it, encrypted text remains unverified an
 the probe cannot pass. Do not derive a purported observed capture from the plan
 alone. Plaintext logs need no separate capture.
 
-`execution_passed`, `protocol_passed`, `recovery_observed` and `settings_preserved`
-remain separate. A corrected invalid first report cannot become a clean first-pass
-result. `complete` requires execution and first-pass protocol; optional display
-also gates completion only when explicitly requested. `display_passed: false`
+`execution_passed`, `protocol_passed`, `recovery_observed`, `settings_preserved`,
+`selection_verified`, `coordinator_settings_preserved`, and `display_passed`
+remain separate. `requested_worker_settings` and `observed_worker_settings` expose
+the expected settings and every observed child turn's settings. For inherited
+probes, `selection_verified` is always false. For explicit selection it requires
+the exact dispatch, bound child, matching settings and unchanged Coordinator;
+it does not imply successful work, valid report protocol, or model competence.
+`settings_preserved` means all worker settings match the expected inherited or
+explicitly selected settings. A corrected invalid first report cannot
+become a clean first-pass result. `complete` requires execution and first-pass
+protocol; optional display also gates completion only when explicitly requested. `display_passed: false`
 means unobserved when no display was requested, not an upgrade failure. Omit
 unrequested display results from user-facing upgrade reports.
 Authentication remains `not_exposed`; unchanged provider/permissions and absent
@@ -141,7 +195,12 @@ establishes client qualification.
 `status-probe` reads the same record and checks applicability without another
 dispatch. It verifies immutable evidence hashes and captured log prefixes while
 allowing later appended events. A later parent turn can reconcile the original
-consumed attempt; it cannot begin a stale prepared packet. Record the hashed probe
-receipt under the matching root/client update outcomes.
+consumed attempt; it cannot begin a stale prepared packet. Appended Coordinator
+or worker settings drift invalidates cached preservation and selection evidence
+even after restoration. Matching appended worker turns remain valid. Legacy
+inherited and selected-worker receipts retain their exact original packets,
+including the former display-related report wording; status checks never rewrite
+those receipts. Record the hashed probe receipt under the matching root/client
+update outcomes.
 Do not relabel CLI execution as App or VS Code, reuse another window's worker, or
 treat installation, discovery, and execution as interchangeable evidence.

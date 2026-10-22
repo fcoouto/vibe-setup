@@ -17,7 +17,12 @@ the helper request schemas, recovery and manual actions.
 Delegation follows Vibe's [policy and execution contract](delegation-brief.md).
 Prefer enabled, approved local models through the installed `local-model-delegation`
 plugin when the full task fits assessed capability and safe capacity. Otherwise
-retain authorized native execution. Preserve user restrictions; setup does not
+retain authorized native execution. Under an explicitly adopted worker-selection
+policy, the Coordinator chooses the worker model and reasoning by difficulty, risk
+and scoped qualification while keeping its own settings unchanged. Use the
+delegation guide's local-first gates, finite recovery and complete-cost accounting;
+qualification of model controls is separate from task competence and savings.
+Preserve user restrictions; setup does not
 implicitly approve models or enable routing. Local proposals bypass native hooks
 and require coordinator verification before integration. Read the linked plugin
 workflow at the installed version for local execution; do not copy its procedures
