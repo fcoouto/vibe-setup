@@ -358,7 +358,9 @@ Actual behavior still requires a real client fixture.
    below into `.codex-delegations/parser_fix.json` as **raw JSON**, without Markdown
    fences. Assign its role and specialty; keep the task name as the unique task
    identity. Finish writing before dispatch; keep it unchanged until the worker ends.
-3. Call the native spawn tool with `task_name: "parser_fix"`. Its task message
+3. Prepare the native tool arguments before calling it. `task_name` is a required
+   top-level argument, even if the client's tool schema makes it optional. A name
+   in the message or declaration filename does not supply this argument. Its task message
    must name the harness root and include exactly one declaration pointer, for example:
    `Harness root: <absolute harness root>. Read .codex-delegations/parser_fix.json before work.`
    Name the software repository and command directory separately. State the base
@@ -369,6 +371,30 @@ Actual behavior still requires a real client fixture.
    and its actual diff/checks/report. Compare trusted child identity when available;
    otherwise retain the explicit unverified-binding risk. A structurally valid
    record or report is not evidence of successful work.
+
+Use this required argument shape, replacing the example name and root together:
+
+```json
+{
+  "task_name": "parser_fix",
+  "message": "Harness root: /absolute/harness. Read .codex-delegations/parser_fix.json before work."
+}
+```
+
+Before the first tool call, check the actual argument object: its top-level
+`task_name` matches `[a-z0-9_]{1,64}`, the declaration filename and the one pointer
+in `message`; the declaration is complete and readable under the active harness
+root. Inspect the current native tool schema before adding client-specific fields.
+If that tool cannot carry `task_name`, report an unsupported dispatch format without
+trying it. For inherited execution, omit model, reasoning and profile overrides.
+These are coordinator checks; the existing hook remains the independent guard.
+
+For a single-attempt qualification, a rejected tool call consumes the attempt even
+when no child starts. Record the denial and stop that run. A later authorized run
+gets a fresh declaration and separate evidence; do not turn a retry into a pass.
+Report required role, specialty and directory observations inside `summary` or
+`checks`, using only the seven report fields below. Additional fields such as
+`observed` invalidate the report.
 
 The coordinator owns these transient inputs, avoids task-name reuse between
 active workers and excludes them from publication using the setup recipe.

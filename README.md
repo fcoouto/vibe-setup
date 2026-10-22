@@ -53,6 +53,13 @@ cleanup with opt-out. Normal tasks invoke the helper through project instruction
 App and VS Code qualification remains evidence for the actual client/version/root;
 installation alone never establishes execution.
 
+For updates, the [update workflow](skills/vibe-setup/update-contract.md) tracks the
+shared skill, explicitly selected consumers, native client tests and delivery in
+one recoverable private record. The [qualification helper](skills/vibe-setup/qualification.md)
+prepares complete native dispatch arguments and separates execution, first-report
+validity and observed Habblaud labels. Current model and execution settings remain
+under each client's control.
+
 ## Develop
 
 The portable guard and tests require Python 3.11+ and POSIX support (macOS/Linux).

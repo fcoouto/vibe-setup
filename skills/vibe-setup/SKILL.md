@@ -24,6 +24,26 @@ into Vibe or apply newer repository instructions to an older installation implic
 
 ## Procedure
 
+For an update or reapply, start with the [update transaction](update-contract.md).
+Create one private plan covering the released candidate, the existing installed
+copy, explicitly selected/enrolled project roots and requested clients. Identify
+source-only roots separately from consumers and umbrellas. Reuse applicable
+authorization; state concrete changes before asking for missing scope. Freeze
+owned-file baselines and check remote access before dependent publication work.
+Use `plan-update`, then the reviewed `apply-update`/`resume-update`; preserve
+customization conflicts and independent lifecycle/cleanup opt-outs. Stage the
+whole skill outside discovery before replacing owned files. No-change updates
+reuse evidence only while its source/client bindings remain current.
+
+Qualify one canary in each requested client before expanding a rollout. Use
+[native qualification](qualification.md): `prepare-probe`, arm any required badge
+observer, persist `begin-probe`, then pass its exact `native_arguments` to the
+native tool once. Reconcile real logs with `record-probe`. A denial consumes the
+attempt. Keep first-report validity, recovery and display separate. Record every
+required outcome through `record-update`; use `status-update` for the single
+completion view. Pending trust, inaccessible remotes, ineffective exclusions and
+queued archival remain named dependencies with next actions, never completion.
+
 1. **Discover.** Confirm the destination, active instructions, dirty changes,
    software roots, active harness root, stack, canonical documents, requested
    Codex clients and authorization. If opened in the toolkit distribution,
@@ -85,6 +105,10 @@ into Vibe or apply newer repository instructions to an older installation implic
    disposable harness cases. Confirm the resolved project configuration layer is
    trusted and loaded before requesting hook approval; untrusted project hooks
    may be absent from the approval list. Follow [client qualification](README.md#3-establish-trust-and-actual-execution).
+   Before a native probe, verify its session root and prepare the complete
+   [dispatch arguments](delegation-brief.md#prepare-each-dispatch), including the
+   required top-level `task_name`. A rejected dispatch consumes a single-attempt
+   run; stop and record it rather than retrying and reporting a clean pass.
    Test safe reruns and customizations. Record installation, discovery and
    execution separately. Request necessary trust/restart/authentication actions;
    continue work independent of those blockers. Hooks are guardrails and can

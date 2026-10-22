@@ -75,6 +75,15 @@ An explicit file read is useful fallback evidence, not automatic discovery proof
 
 ## Complete-run contract
 
+Updates use the [scoped update transaction](update-contract.md), which joins the
+shared skill, selected project copies, local activation, client evidence and
+delivery in one private record. It freezes a complete candidate, preserves owned
+baselines/customizations, resumes interrupted writes and reports unmet outcomes.
+It does not enroll unrelated repositories or infer native trust from file hashes.
+Use the [single-attempt qualification helper](qualification.md) in each requested
+client. Actual execution, first-report validity and Habblaud display have separate
+results. A no-op needs no new writes or probes when applicable evidence is valid.
+
 The skill drives the full Prompt 12 procedure; the sections below supply the
 portable implementation details. The pinned package baseline above describes its
 origin, not a permanent upstream selection. Use a user-supplied revision or local
@@ -318,6 +327,24 @@ RTK or subagent handlers. If a command, matcher or source changes, recheck trust
 Confirm actual loading after changes rather than relying on an existing chat.
 
 ### Worktree and delivery qualification
+
+For a bounded read-only native smoke test, prepare a fresh declaration and the
+complete [dispatch argument object](delegation-brief.md#prepare-each-dispatch)
+before invoking the tool. The object must contain top-level `task_name` and
+`message`; a task name mentioned only in prose is insufficient. Verify the native
+session/project root against the intended harness before dispatch. A shell
+`workdir` override does not retarget the chat or its loaded hooks. If the roots
+differ, stop before the tool call and request the correctly rooted client context;
+do not mirror declarations into a second root.
+
+Give the worker the exact seven report fields and put additional observations
+inside `summary` or `checks`. Preserve current settings by omitting native model,
+reasoning and profile overrides. When the run allows one attempt, record every
+dispatch invocation, including denials before worker creation, and stop on the
+first failure. Evaluate first-report validity separately from hook correction.
+A successful worker after a denied dispatch proves recovery, not a clean
+single-attempt pass. Retain both outcomes and bind evidence to the actual client,
+session, root, payload and declaration; a previous run cannot qualify a new one.
 
 For the integrated helper, exercise each selected client through its actual native
 agent/tool surface. A CLI-only subprocess cannot qualify the App or VS Code.
