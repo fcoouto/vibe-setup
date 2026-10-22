@@ -91,6 +91,12 @@ def native_context(rows):
     return meta, turn, settings
 
 
+def settings_match(rows, expected):
+    return all({**{key: row["payload"].get(key) for key in SETTINGS},
+                "provider": expected["provider"]} == expected
+               for row in rows if row.get("type") == "turn_context")
+
+
 def validate_observation(observation, root, meta, wf):
     fields(observation, ("client", "thread_id", "runtime", "harness_root", "observed_via", "hook_sources"))
     if (observation["client"] not in ("app", "vscode") or observation["thread_id"] != meta["id"]
@@ -148,23 +154,49 @@ def guard():
     return runpy.run_path(str(PACKAGE / ".codex/hooks/subagents.py"))
 
 
-def packet(root, name, tool):
+def worker_selection(request):
+    selection = request.get("worker_selection")
+    if "worker_selection" not in request:
+        return None
+    fields(selection, ("model", "reasoning_effort", "authorization", "supported_pairs"))
+    if (not all(nonblank(selection[key]) for key in ("model", "reasoning_effort", "authorization"))
+            or not {"model", "reasoning_effort", "fork_turns"} <= set(request["tool"]["fields"])):
+        raise ValueError("Explicit worker selection requires authorization and supported native controls")
+    pairs = selection["supported_pairs"]
+    if not isinstance(pairs, list) or not 1 <= len(pairs) <= 128:
+        raise ValueError("Supply bounded model/effort pairs observed from this native host")
+    for pair in pairs:
+        fields(pair, ("model", "reasoning_effort"))
+        if not all(nonblank(value) for value in pair.values()):
+            raise ValueError("Observed model/effort pairs must be nonblank")
+    if {key: selection[key] for key in ("model", "reasoning_effort")} not in pairs:
+        raise ValueError("Requested worker model/effort pair is not supported by this host observation")
+    return selection
+
+
+def packet(root, name, tool, selection=None):
     skeleton = {"status": "done", "summary": "Describe the observed role, specialty, root and result.",
                 "changed_files": [], "checks": ["List actual read results."], "risks": [], "blockers": [],
                 "next_action": "Coordinator verifies native evidence and display."}
+    settings_instruction = ("preserve inherited model, reasoning, provider, authentication and permissions. "
+        if selection is None else
+        f"use the explicitly selected worker model {selection['model']} and reasoning {selection['reasoning_effort']}; "
+        "preserve provider, authentication and permissions. Do not change Coordinator settings. ")
     args = {"task_name": name, "message": (
         f"Harness root: {root}. Read .codex-delegations/{name}.json before work. Software and command root: {root}. "
-        "Read only the declared files; preserve inherited model, reasoning, provider, authentication and permissions. "
+        "Read only the declared files; " + settings_instruction +
         "Do not delegate, write, install, run tests, invoke hooks or retry. Return exactly one delegation-report JSON fence "
         "with these seven fields only; replace example text with actual findings: " + json.dumps(skeleton))}
     if "fork_turns" in tool["fields"]:
         args["fork_turns"] = "all"
+    if selection is not None:
+        args.update(model=selection["model"], reasoning_effort=selection["reasoning_effort"], fork_turns="none")
     return args, skeleton
 
 
 def prepare(root, request, wf):
     fields(request, ("record_path", "task_name", "parent_log", "client_context", "tool", "read_paths",
-                     "protected_files", "display_required"))
+                     "protected_files", "display_required"), ("worker_selection",))
     if type(request["display_required"]) is not bool:
         raise ValueError("display_required must be boolean")
     name = request["task_name"]
@@ -176,6 +208,7 @@ def prepare(root, request, wf):
             or not all(isinstance(item, str) for item in tool["fields"])
             or not {"task_name", "message"} <= set(tool["fields"])):
         raise ValueError("The current native tool schema cannot carry the required dispatch packet")
+    selection = worker_selection(request)
     _, rows = log_rows(request["parent_log"], wf)
     meta, turn, settings = native_context(rows)
     observation, observation_ref = artifact(request["client_context"], wf)
@@ -204,7 +237,7 @@ def prepare(root, request, wf):
         expected_reads.append({**item, "sha256": digest(raw)})
     if len({item["path"] for item in expected_reads}) != len(expected_reads):
         raise ValueError("Do not duplicate probe read paths")
-    args, skeleton = packet(root, name, tool)
+    args, skeleton = packet(root, name, tool, selection)
     return {"schema_version": 1, "run_id": str(uuid4()), "root": str(root), "state": "prepared",
             "request": request, "native_arguments": args, "report_skeleton": skeleton,
             "specialty_assessment": "Not assessed", "role": brief["role"], "settings": settings,
@@ -212,7 +245,8 @@ def prepare(root, request, wf):
             "context": observation, "context_ref": observation_ref, "reads": expected_reads,
             "protected": protected_snapshot(request["protected_files"], wf), "attempts": 0,
             "workspace": workspace_snapshot(root, wf),
-            "prepared_at": time.time(), "result": None}
+            "prepared_at": time.time(), "result": None,
+            **({"worker_selection": loads(json.dumps(selection))} if selection is not None else {})}
 
 
 def revalidate(record, root, wf, *, before_dispatch=False):
@@ -220,7 +254,7 @@ def revalidate(record, root, wf, *, before_dispatch=False):
                 "specialty_assessment", "role", "settings", "parent_thread_id", "parent_turn_id", "client", "context",
                 "context_ref", "reads", "protected", "attempts", "workspace", "prepared_at", "result"}
     consumed = {"begun_at", "parent_offset", "parent_prefix_sha256"}
-    fields(record, required, consumed)
+    fields(record, required, consumed | {"worker_selection"})
     if record.get("schema_version") != 1 or record.get("root") != str(root):
         raise ValueError("Unsupported or foreign probe receipt")
     if record.get("state") not in ("prepared", "begun", "denied", "uncertain", "observed"):
@@ -236,7 +270,7 @@ def revalidate(record, root, wf, *, before_dispatch=False):
         raise ValueError("Malformed consumed-attempt evidence")
     request = record["request"]
     fields(request, ("record_path", "task_name", "parent_log", "client_context", "tool", "read_paths",
-                     "protected_files", "display_required"))
+                     "protected_files", "display_required"), ("worker_selection",))
     if (not isinstance(request["task_name"], str) or not re.fullmatch(r"[a-z0-9_]{1,64}", request["task_name"])
             or type(request["display_required"]) is not bool):
         raise ValueError("Malformed qualification request")
@@ -245,7 +279,10 @@ def revalidate(record, root, wf, *, before_dispatch=False):
             or not all(isinstance(item, str) for item in request["tool"]["fields"])
             or not {"task_name", "message"} <= set(request["tool"]["fields"])):
         raise ValueError("Unsupported native tool packet")
-    args, skeleton = packet(root, request["task_name"], request["tool"])
+    selection = worker_selection(request)
+    if selection != record.get("worker_selection"):
+        raise ValueError("Prepared worker selection, authorization or host inventory changed")
+    args, skeleton = packet(root, request["task_name"], request["tool"], selection)
     if record["native_arguments"] != args or record["report_skeleton"] != skeleton:
         raise ValueError("Prepared native arguments changed; never dispatch overrides or a rebuilt message")
     contract = guard()
@@ -269,6 +306,10 @@ def revalidate(record, root, wf, *, before_dispatch=False):
     if (meta["id"] != record["parent_thread_id"] or (before_dispatch and turn["turn_id"] != record["parent_turn_id"])
             or settings != record["settings"]):
         raise ValueError("Native parent context changed; the prepared packet is stale")
+    if record["result"] and record["result"].get("coordinator_settings_preserved"):
+        later = [loads(line) for line in raw[record["parent_offset"]:].splitlines() if line.strip()]
+        if not settings_match(later, record["settings"]):
+            raise ValueError("Coordinator settings changed after dispatch; invalidate cached preservation evidence")
     return raw, rows
 
 
@@ -318,11 +359,17 @@ def successful_spawn(outputs, child_id, name):
 
 
 def evaluate(record, request, wf):
-    raw, _ = revalidate(record, Path(record["root"]), wf)
+    raw, parent_rows = revalidate(record, Path(record["root"]), wf)
     offset = record["parent_offset"]
     if digest(raw[:offset]) != record["parent_prefix_sha256"]:
         raise ValueError("Parent native history changed; preserve and inspect evidence")
-    events = [loads(line).get("payload", {}) for line in raw[offset:].splitlines() if line.strip()]
+    new_rows = [loads(line) for line in raw[offset:].splitlines() if line.strip()]
+    events = [row.get("payload", {}) for row in new_rows]
+    coordinator_ok = settings_match(new_rows, record["settings"])
+    selection = record.get("worker_selection")
+    expected_settings = dict(record["settings"])
+    if selection is not None:
+        expected_settings.update(model=selection["model"], effort=selection["reasoning_effort"])
     calls = [item for item in events if item.get("type") in ("function_call", "custom_tool_call")
              and item.get("name") in SPAWNS]
     observed_args = []
@@ -353,13 +400,15 @@ def evaluate(record, request, wf):
     denied = any("dispatch denied" in text.lower() for item in outputs for text in output_strings(item))
     result = {"attempts": 1, "native_calls": len(calls), "execution_passed": False,
               "protocol_passed": False, "recovery_observed": False, "settings_preserved": False,
+              "selection_verified": False, "coordinator_settings_preserved": coordinator_ok,
+              "requested_worker_settings": expected_settings, "observed_worker_settings": [],
               "display_passed": False, "complete": False, "authentication": "not_exposed",
               "state": "denied" if denied else "uncertain", "child_thread_id": None,
               "evidence": dispatch_refs, "next_action": "Reconcile this consumed attempt; never dispatch it again."}
     if denied or "child_log" not in request:
         return result
     child_raw, child_rows = log_rows(request["child_log"], wf)
-    meta, _, settings = native_context(child_rows)
+    meta, _, _ = native_context(child_rows)
     spawn = meta.get("source", {})
     spawn = spawn.get("subagent", {}).get("thread_spawn", {}) if isinstance(spawn, dict) else {}
     parent = meta.get("parent_thread_id", spawn.get("parent_thread_id"))
@@ -377,12 +426,24 @@ def evaluate(record, request, wf):
     starts = [index for index, row in enumerate(child_rows) if row.get("type") == "turn_context"
               and row["payload"].get("root_turn_id") == record["parent_turn_id"]
               and row["payload"].get("turn_id") != record["parent_turn_id"]]
+    if selection is not None:
+        # A fresh worker has no inherited root turn. Bind its first turn to the
+        # native task-start event, excluding every observed parent turn identity.
+        parent_turns = {row["payload"].get("turn_id") for row in parent_rows if row.get("type") == "turn_context"}
+        turns = [(index, row["payload"]) for index, row in enumerate(child_rows) if row.get("type") == "turn_context"]
+        starts = []
+        if turns:
+            index, turn = turns[0]
+            started = any(row.get("type") == "event_msg" and row.get("payload", {}).get("type") == "task_started"
+                          and row["payload"].get("turn_id") == turn.get("turn_id") for row in child_rows[:index])
+            if started and all(nonblank(item.get("turn_id")) and item["turn_id"] not in parent_turns for _, item in turns):
+                starts = [index]
     if not starts:
         raise ValueError("Cannot distinguish child execution from inherited history")
     own = child_rows[starts[0]:]
     child_settings = [{**{key: row["payload"].get(key) for key in SETTINGS}, "provider": meta.get("model_provider")}
                       for row in own if row.get("type") == "turn_context"]
-    settings_ok = bool(child_settings) and all(item == record["settings"] for item in child_settings)
+    settings_ok = bool(child_settings) and all(item == expected_settings for item in child_settings)
     items = [row.get("payload", {}) for row in own if row.get("type") == "response_item"]
     reports = []
     for item in items:
@@ -418,13 +479,15 @@ def evaluate(record, request, wf):
     unexpected_actions = any(item.get("type") in ("function_call", "custom_tool_call")
                              and item.get("name") in mutation_tools for item in items)
     workspace_ok = workspace_snapshot(Path(record["root"]), wf) == record["workspace"]
-    execution = bool(argument_match and result_bound and settings_ok and workspace_ok and not unexpected_actions
+    execution = bool(argument_match and result_bound and settings_ok and coordinator_ok and workspace_ok and not unexpected_actions
                      and all(read_results.values()) and final
                      and final["status"] == "done" and not final["changed_files"] and not final["blockers"])
     protocol = bool(argument_match and result_bound and len(reports) == 1 and parsed[0] and not unexpected_actions)
     result.update(state="observed", execution_passed=execution, protocol_passed=protocol,
                   recovery_observed=len(reports) > 1 and parsed[0] is None and final is not None,
                   settings_preserved=settings_ok, child_thread_id=meta["id"], read_results=read_results,
+                  selection_verified=bool(selection is not None and argument_match and result_bound and settings_ok and coordinator_ok),
+                  observed_worker_settings=child_settings,
                   first_report_valid=bool(parsed and parsed[0]), final_reports=len(reports),
                   workspace_preserved=workspace_ok, arguments_verified=argument_match,
                   evidence=dispatch_refs + [{"path": request["child_log"], "sha256": digest(child_raw), "bytes": len(child_raw)},

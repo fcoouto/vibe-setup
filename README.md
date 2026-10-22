@@ -29,6 +29,14 @@ points to the plugin's own documentation for local execution. It is installed as
 project's existing `AGENTS.md` and documentation; the installer does not edit those
 entry points automatically.
 
+Worker selection is opt-in: the Coordinator can choose model and reasoning for
+workers by task difficulty and risk while keeping its own settings unchanged.
+Qualified approved local models have priority when the complete task fits and
+capacity is admitted. Native fallback, bounded recovery, qualification states and
+full-cost measurement follow the [selection policy](skills/vibe-setup/delegation-brief.md#difficulty-based-worker-selection).
+The helper prepares/checks decisions; it neither calls models nor certifies model
+competence. App and VS Code require separate observed selection evidence.
+
 ## Use
 
 Review the self-contained package in [`skills/vibe-setup`](skills/vibe-setup/README.md),

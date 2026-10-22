@@ -362,7 +362,7 @@ SETUP_FILES = (".codex/hooks/subagents.py", ".codex/hooks/native_display.py",
                ".codex/delegation-brief.md", ".codex/native-display.md",
                ".codex/config.toml", ".codex/hooks.json", ".gitignore", ".graphifyignore",
                ".codex/vibe-workflow.toml")
-PACKAGE_FILES = ("workflow.py", "install.py", "update_workflow.py", "native_qualification.py",
+PACKAGE_FILES = ("workflow.py", "install.py", "update_workflow.py", "native_qualification.py", "delegation_policy.py",
                  ".codex/hooks/subagents.py", ".codex/hooks/native_display.py",
                  "delegation-brief.md", "native-display.md", ".codex/config.toml", ".codex/hooks.json",
                  ".codex/vibe-workflow.toml")
@@ -1438,7 +1438,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     update_operations = ("plan-update", "apply-update", "resume-update", "rollback-update", "record-update", "status-update")
     probe_operations = ("prepare-probe", "begin-probe", "record-probe", "status-probe")
-    parser.add_argument("operation", choices=("inspect", "start", "apply", "sync", "resume") + update_operations + probe_operations)
+    delegation_operations = ("plan-delegation", "report-delegation")
+    parser.add_argument("operation", choices=("inspect", "start", "apply", "sync", "resume") + update_operations + probe_operations + delegation_operations)
     parser.add_argument("root", type=Path, help="Selected project/source checkout")
     parser.add_argument("--client", action="append", choices=("app", "vscode"), default=[])
     parser.add_argument("--task-id", help="Include a read-only setup plan for a verified task worktree")
@@ -1458,10 +1459,11 @@ def main(argv: list[str] | None = None) -> int:
             if len(payload) > 65536:
                 raise ValueError("Request exceeds 64 KiB")
             request = json.loads(payload, object_pairs_hook=unique_object)
-            if args.operation in update_operations + probe_operations:
+            if args.operation in update_operations + probe_operations + delegation_operations:
                 if args.client or args.task_id or args.file:
-                    raise ValueError("Update and probe operations take their explicit scope in the JSON request")
-                module = "update_workflow.py" if args.operation in update_operations else "native_qualification.py"
+                    raise ValueError("Update, probe and delegation operations take their explicit scope in the JSON request")
+                module = ("update_workflow.py" if args.operation in update_operations else
+                          "delegation_policy.py" if args.operation in delegation_operations else "native_qualification.py")
                 handler = runpy.run_path(str(Path(__file__).resolve().parent / module))["handle"]
                 output = handler(args.operation, args.root, request, globals())
             elif args.operation == "start":

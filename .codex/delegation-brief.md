@@ -12,6 +12,7 @@ Its procedures stay in that project. The user's authorization and active project
 instructions govern both routes; availability alone grants no authority.
 
 - [Choose the execution route](#choose-the-execution-route)
+- [Difficulty-based worker selection](#difficulty-based-worker-selection)
 - [Role and specialty](#role-and-specialty)
 - [Task and specialty guide](#task-and-specialty-guide)
 - [Role visibility in Habblaud](#role-visibility-in-habblaud)
@@ -46,6 +47,198 @@ Preserve the coordinator's native model, reasoning, provider, authentication and
 permissions. Reuse existing approvals; ordinary task delegation does not authorize
 installation, assessment, new approvals or route activation. Do not weaken task
 requirements to fit a local model, or claim savings without evidence.
+
+## Difficulty-based worker selection
+
+The Coordinator owns classification, selection, acceptance and integration. Keep
+its model, reasoning, provider, authentication and permissions unchanged. With
+explicit project/task authorization, choose each worker's model and reasoning
+through the actual client's supported controls. Roles and specialties do not
+select native profiles. Never change global defaults, install a proxy, introduce
+API billing or inspect credentials to obtain another model.
+
+Worker selection is opt-in. Record it independently of lifecycle preferences in
+`.codex/vibe-workflow.toml`:
+
+```toml
+[worker_selection]
+enabled = true
+authorization_ref = "reference to the user's scoped authorization"
+```
+
+Absent settings or `enabled=false` retain the existing authorized route. Setup
+does not activate selection for other projects, approve local models or expand
+benchmark authority. Preserve explicit model restrictions and task overrides.
+Available models are discovered from the current authenticated host; portable
+instructions never hard-code a commercial model list.
+
+### Classify difficulty and risk
+
+Rate reasoning complexity, ambiguity, dependency coupling and context burden
+from 0 to 3, with one concrete reason for each. Use the maximum, not an average;
+file count and diff size alone do not establish difficulty.
+
+| Tier | Required reasoning | Initial search, subject to qualification |
+| --- | --- | --- |
+| D0 | Explicit retrieval/transformation, bounded context, deterministic checks. | Direct tool/Coordinator first; otherwise lightweight capability, low effort. |
+| D1 | Known contract/cause, bounded implementation or focused tests. | Lightweight/balanced capability, medium effort. |
+| D2 | Interacting components/state, substantial context or uncertain diagnosis. | Reasoning-capable model, high effort. |
+| D3 | Architecture, deep ambiguity, concurrency or adversarial judgment. | Best demonstrated pair for the exact scope; higher supported effort only when justified. |
+
+These are search starting points, not certified model mappings. Effort labels
+are not equivalent across models. Risk is separate: R0 is negligible-impact
+read-only/reversible work; R1 is ordinary behavior change; R2 covers security,
+privacy, authorization, irreversible data effects or comparable impact. R2 raises
+the tier to at least D2 and requires domain-specific evidence and independent
+review. Read-only security review can be R2. A one-line authorization edit is
+not a cheap mechanical task. Uncertainty takes the higher plausible tier until
+investigation resolves it.
+
+Define acceptance checks before selection. If a result cannot be independently
+verified, narrow the assignment or keep judgment with the Coordinator. A larger
+model does not supply missing verification. Review qualification needs evidence
+of finding defects and avoiding unsupported findings; successful implementation
+alone does not qualify a reviewer.
+
+### Prefer qualified local execution
+
+First keep tasks with deterministic tools or the Coordinator when delegation
+cannot justify its overhead. Otherwise prefer a local model when its exact
+approved scope/settings match the entire task, routing is enabled, the plugin
+admits capacity, and verification is supported. Match language/domain, specialty,
+difficulty, risk, context, tool and output needs; do not infer capability from a
+name, parameter count or a broad specialty label.
+
+Unknown savings alone does not disqualify an eligible local route. A documented
+hard deadline or comparable measured harmful outcomes may justify native work;
+record that evidence and the rejected local option. Do not prefer a paid model
+merely because its isolated call appears faster. Preserve the plugin's waiting,
+reservation and recovery rules; never clear an uncertain reservation to obtain
+capacity. Local runtime/thinking settings stay within approved assessed profiles.
+
+When local execution is ineligible, select an authorized native pair with matching
+qualification. Compare full expected cost: briefing, attempts, verification,
+repair/fallback and integration. Without comparable cost data, call the ranking
+provisional, not cheapest. If no pair qualifies, retain the existing authorized
+inherited route or the Coordinator and disclose the evidence gap.
+
+Select model and effort together. Full-history forks in clients that require
+inheritance cannot carry overrides: use a fresh context with the task's complete
+bounded brief and explicit supported model/effort fields. Inspect native profile
+and default precedence. Record requested and observed settings separately. A
+mismatch fails selection: stop/reconcile that worker before replacement and
+preserve partial work. If observations or overrides are unavailable, retain the
+authorized inherited route and mark model-selection qualification unverified.
+
+### Qualification states and finite recovery
+
+Qualification binds exact observable model/version, reasoning, client/tool path,
+role/specialty, language/domain, tier/risk and context/output bounds. Local records
+also bind artifact/runtime/settings digests. An alias without immutable version
+information carries a dated observation and freshness limit, not invented identity.
+
+| State | Permitted execution |
+| --- | --- |
+| Not assessed | Separately authorized bounded evaluation only; entry records Pilot only. |
+| Pilot only | Authorized evaluation; capped canary only after the case gate and scoped canary authorization. |
+| Qualified | Matching ordinary work with current evidence and all authorization/capacity gates. |
+| Suspended | No ordinary work; diagnosed, newly authorized reassessment must pass before promotion. |
+
+The preserved inherited route is the baseline/fallback exception, not blanket
+competence certification. These states never bypass local plugin approval or
+assessment gates; an ordinary local submission cannot relabel itself a pilot.
+
+Initial qualification defaults per narrow scope: 12 distinct paired cases
+(four ordinary, four boundary, four difficult/failure), one candidate pair versus
+the preserved inherited baseline; 24 worker invocations plus separately budgeted
+evaluation. Freeze inputs, checks, tool permissions and context policy; separate
+contexts and counterbalance order. Hidden oracles are not worker context. Require
+all mandatory criteria, no critical violations, and dedicated cases for D2/D3/R2.
+Baseline failures remain failures. Then permit a scoped ten-task canary: ten
+candidate deliveries must pass without escalation, Coordinator rewriting or major
+attributable regression. Rescue completes work but never qualifies that candidate.
+These are operational gates, not statistical reliability guarantees. A failed
+cohort cannot silently restart until a reviewed scope and budget authorize it.
+
+Ordinary task budget defaults to at most two dispatch/submission attempts total:
+initial plus one justified repair/escalation. Stricter project/task limits win;
+a denied dispatch consumes an attempt. Record a concrete deadline/output allowance
+before dispatch. Diagnose failure before changing one justified variable; no
+identical retries, cascading agent trees or implicit budget resets. Unknown worker
+state requires reconciliation, not duplicate execution. Coordinator rescue remains
+inside the task budget and measured costs. Workers do not choose replacements.
+
+Suspend affected qualifications on critical violations, confirmed major missed
+defects, repeated settings mismatches or material source/client/model changes.
+Retain negative evidence and unaffected qualifications. Benchmark allowance defaults
+to zero; ordinary delegation never authorizes extra comparisons or assessments.
+
+### Decision records, validation and savings
+
+Keep private records outside Git: policy/task/attempt IDs, source/contract/check
+hashes, classification reasons/risk, authorization and qualification references,
+client-supported pairs, Coordinator baseline, candidate/rejection reasons, exact
+requested/observed settings, child/local job identity, budgets, checks and outcomes.
+Unknown values remain unknown. Do not add fields to the strict native declaration
+or seven-field report: reference private decisions through existing context or
+instructions. Existing hooks validate structure; they do not enforce model choice,
+time limits, truth, sandboxing or the whole policy and can fail open.
+
+Use `workflow.py plan-delegation ROOT` for deterministic planning and
+`report-delegation ROOT` to reconcile observations and measurement evidence.
+These helpers make no model calls, change no settings and grant no authority.
+They validate attributed input evidence, not its truth. Actual local execution and
+measurements remain with the installed plugin; do not create a duplicate scheduler
+or registry. Native/native comparison records are separate from the plugin's
+local/native comparison interface. See the package README for request contracts.
+
+Test policy boundaries deterministically, then qualify App and VS Code separately
+with the [native qualification](https://github.com/fcoouto/vibe-setup/blob/main/skills/vibe-setup/qualification.md) procedure from the installed
+package. A selected worker must demonstrably use the requested model/effort while
+the Coordinator remains unchanged. Inherited smoke tests, CLI runs, unit fixtures,
+installation and Habblaud labels cannot establish that client result. Model-control
+qualification also does not establish task competence or savings.
+
+Compare identical delegated assignments with inherited versus selected workers to
+isolate selection. A separate comparison against direct Coordinator execution is
+needed to claim delegation itself saves resources. Keep context and verification
+requirements equal; changing context and model together does not isolate either.
+
+Maintain three accounts: operating difference (matched baseline minus candidate,
+including all attempts/overhead); experiment investment (both disposable arms,
+evaluation, setup and qualification); and delivered-work net estimate (matched
+baseline-referenced differences on delivered work minus investment). A disposable
+100-unit baseline and 60-unit candidate show a 40-unit operating difference but
+spend 160 units and deliver no production saving. Ten subsequent matched delivered
+tasks costing 60 instead of baseline 100 give a 240-unit net estimate after that
+160-unit investment, before other overhead. This is a counterfactual resource
+estimate, not a subscription saving.
+
+Deduplicate authoritative spans; totals take precedence over their components;
+charge each span once to task costs or investment. Include unsuccessful work,
+rescue, measurement overhead and unallocated investment in cumulative reports.
+No amortization over hypothetical tasks. Preserve negative savings. Zero baseline
+makes percentages not applicable. Missing/incomplete attribution or incomparable
+baselines makes full-task savings unknown, never zero cost.
+
+Report case counts/diversity, first-attempt acceptance, delivery, missed defects,
+false-positive findings, fallback rate, timing and usage coverage by scope and
+model. Keep local failures separate from native rescue. Cached input/reasoning
+subsets are not extra tokens. Never infer usage from characters, elapsed time,
+quota percentages or badges. Tokens are proxies; currency requires applicable
+billing evidence or clearly labeled estimates, never API prices applied to a
+subscription. Local energy/runtime costs remain unknown unless measured.
+
+Show end-to-end latency separately from summed parallel runtime; include failures
+and timeouts. P95 requires at least 20 observations. Proposed optimization target:
+10% full-cost improvement with no mandatory quality regression. Repeatable-savings
+claims need at least 20 distinct matched cases and a positive lower 95% confidence
+bound under a frozen case-cluster analysis; sample count alone is insufficient.
+Additional trials require their own budget. Observational work is not a causal
+comparison. Without telemetry, report quality/timing and savings unknown.
+
+Rollback disables worker selection, retains inherited execution and all evidence,
+and preserves in-flight ownership. Do not mutate local approvals or uncertain jobs.
 
 ## Role and specialty
 
@@ -317,7 +510,9 @@ evidence means unknown.
 
 Use native subagents with the active client's provider, authentication and
 permissions. Inherit the coordinator's model and reasoning unless the user
-authorizes a scoped capability choice, such as the cleanup profile below.
+authorizes task-based worker selection or a scoped capability choice. Under the
+selection policy above, choose explicit supported worker settings; the Coordinator
+remains unchanged. The cleanup profile below remains independently bounded.
 Before dispatch, the coordinator creates a plain JSON declaration
 at the active harness root's `.codex-delegations/<task_name>.json`. This directory
 is beside

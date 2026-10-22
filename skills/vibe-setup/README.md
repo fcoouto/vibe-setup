@@ -55,6 +55,20 @@ Use that complete prompt for the surrounding setup, not only this subagent packa
 On an update, resolve upstream once and record its immutable revision. Compare
 changes before updating an existing integration; preserve customizations.
 
+## Difficulty-based worker selection
+
+Read [the selection policy](delegation-brief.md#difficulty-based-worker-selection).
+The explicit project opt-in preserves Coordinator settings and gives qualified,
+approved local models priority. Native pairs must be supported and qualified for
+the task; eligibility for evaluations/canaries has separate bounded authority.
+Use `workflow.py plan-delegation ROOT` and `report-delegation ROOT` for planning
+and evidence reconciliation. They do not dispatch workers or enable local routing.
+The [planning interface](delegation-planning.md) defines request fields, evidence
+formats, execution responsibilities and complete-cost accounting.
+Use [selected-worker qualification](qualification.md) for actual App/VS Code probes.
+All package files remain necessary installation inputs; no new service or
+third-party dependency is required. Missing telemetry means savings unknown.
+
 ## Install the reusable skill once
 
 Copy this complete reviewed directory, including its hidden `.codex/` assets,
