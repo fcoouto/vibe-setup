@@ -27,6 +27,14 @@ provider, authentication and permissions. Choose supported subagent capability b
 task complexity and risk under the user's policy, or inherit session settings.
 Do not add a provider, proxy or paid API to enable delegation.
 
+For post-merge cleanup, use one bounded worker on a lightweight compatible native
+model, selected from the current host without hard-coded model names. Follow the
+cleanup profile in `.codex/delegation-brief.md`: one Python helper invocation, a
+compact result, no code review, project test reruns, polling or silent upgrade to
+an expensive worker. Preserve coordinator settings, authentication and permissions.
+Cleanup defaults ON with opt-out; confirm all associated PRs merged, delete and
+verify remote branches first, then remove the exact worktree without force.
+
 Use native subagents when independent work, specialization or context isolation
 justifies coordination. Before spawning, write the bounded JSON declaration from
 [the delegation contract](.codex/delegation-brief.md) to

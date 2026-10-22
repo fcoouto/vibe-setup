@@ -16,8 +16,9 @@ The source package also provides [task worktree inspection and startup](task-lif
 and Phase 2 [recoverable recipe setup](onboarding.md) through `workflow.py`.
 Invoke it explicitly from the complete reviewed package. It previews compatible
 changes, applies the guard recipe and lifecycle policy in a verified worktree,
-and resumes interrupted writes without overwriting foreign edits. PR automation
-and automatic client integration remain later phases. The existing installer
+and resumes interrupted writes without overwriting foreign edits. Phase 3 adds PR automation
+and ordered cleanup with a separate opt-out. Automatic client integration remains
+Phase 4. The existing installer
 API/CLI still installs only the subagent component.
 
 Source baseline: [Vibe Prompt 12 at `790a895`](https://github.com/soumatheusgomes/vibe-coding-toolkit/blob/790a895304e0c08b70a5b215c9d334f1c86b816c/docs/prompts/12-existing-project-setup.md).
