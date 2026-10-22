@@ -114,6 +114,39 @@ class NativeQualificationTests(unittest.TestCase):
         self.assertEqual(set(result["report_skeleton"]), set(self.report))
         self.assertEqual(result["specialty_assessment"], "Not assessed")
 
+    def test_default_upgrade_qualifies_native_dispatch_without_a_display_consumer(self):
+        self.request.pop("display_required")
+        self.call("prepare-probe", self.request)
+        self.call("begin-probe")
+        result = self.call("record-probe", self.completed())
+        self.assertTrue(result["complete"])
+        self.assertTrue(result["arguments_verified"])
+        self.assertTrue(result["settings_preserved"])
+        self.assertFalse(result["display_passed"])
+        self.assertTrue(self.call("status-probe")["complete"])
+
+    def test_default_upgrade_still_requires_the_trusted_project_guard(self):
+        self.request.pop("display_required")
+        context = json.loads(self.context.read_text())
+        context["hook_sources"][0]["trusted"] = False
+        self.context.write_text(json.dumps(context))
+        with self.assertRaisesRegex(ValueError, "observed trusted"):
+            self.call("prepare-probe", self.request)
+        self.assertFalse(self.record.exists())
+
+    def test_legacy_prepared_packet_remains_valid_without_rewriting_it(self):
+        self.request["display_required"] = False
+        self.call("prepare-probe", self.request)
+        record = json.loads(self.record.read_text())
+        old = "Coordinator verifies native evidence and display."
+        current = record["report_skeleton"]["next_action"]
+        record["report_skeleton"]["next_action"] = old
+        record["native_arguments"]["message"] = record["native_arguments"]["message"].replace(current, old)
+        self.record.write_text(json.dumps(record))
+        begun = self.call("begin-probe")
+        self.assertEqual(begun["native_arguments"], record["native_arguments"])
+        self.assertTrue(self.call("record-probe", self.completed())["complete"])
+
     def test_public_cli_prepares_a_packet_and_rejects_unknown_request_fields(self):
         command = [sys.executable, "-B", str(PACKAGE / "workflow.py"), "prepare-probe", str(self.root)]
         result = subprocess.run(command, input=json.dumps(self.request), text=True, capture_output=True)

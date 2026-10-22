@@ -11,7 +11,7 @@ Start with the [delegation policy](skills/vibe-setup/delegation-brief.md):
 [roles alongside specialties](skills/vibe-setup/delegation-brief.md#role-and-specialty),
 [optional native role display](skills/vibe-setup/native-display.md),
 [task/specialty table](skills/vibe-setup/delegation-brief.md#task-and-specialty-guide),
-[Habblaud badge compatibility](skills/vibe-setup/delegation-brief.md#role-visibility-in-habblaud),
+[native role metadata](skills/vibe-setup/delegation-brief.md#native-role-metadata),
 [ability versus runtime capacity](skills/vibe-setup/delegation-brief.md#demonstrated-ability-versus-runtime-capacity),
 [route selection](skills/vibe-setup/delegation-brief.md#choose-the-execution-route),
 [model discovery and capacity](skills/vibe-setup/delegation-brief.md#discover-models-and-check-capacity),
@@ -57,7 +57,9 @@ For updates, the [update workflow](skills/vibe-setup/update-contract.md) tracks 
 shared skill, explicitly selected consumers, native client tests and delivery in
 one recoverable private record. The [qualification helper](skills/vibe-setup/qualification.md)
 prepares complete native dispatch arguments and separates execution, first-report
-validity and observed Habblaud labels. Current model and execution settings remain
+validity and inherited settings. Standard upgrades validate hooks and native
+role metadata without an external display service. Consumer testing is separate
+and requires an explicit request. Current model and execution settings remain
 under each client's control.
 
 ## Develop

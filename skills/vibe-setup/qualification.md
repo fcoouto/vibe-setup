@@ -1,10 +1,17 @@
-# Native client qualification
+# Native hook and dispatch qualification
 
 Use the installed `workflow.py` for one bounded read-only canary in each requested
 client. These commands prepare and evaluate evidence; they never run a model,
 invoke a hook, change settings, or grant trust. Keep private JSON outside source
 repositories and discoverable skill directories. Current native tool schemas and
 actual client observations remain authoritative.
+
+The default upgrade checks trusted hook definitions/scripts, exact task identity,
+explicit role/specialty, native child binding, observed reads, first report and
+preserved settings. It requires no external service or display observer. Configured
+hooks and disposable contract tests do not independently prove runtime hook
+invocation; retain actual client hook evidence when available and state that limit
+when it is unavailable. Neither result proves downstream delivery.
 
 ## Prepare before dispatch
 
@@ -54,8 +61,7 @@ Pass this request to `workflow.py prepare-probe /absolute/project` on stdin:
     "fields": ["task_name", "message", "fork_turns"]
   },
   "read_paths": [{"path": "/absolute/project/README.md", "max_lines": 20}],
-  "protected_files": ["/absolute/project/.codex/config.toml", "/absolute/project/.codex/hooks.json"],
-  "display_required": true
+  "protected_files": ["/absolute/project/.codex/config.toml", "/absolute/project/.codex/hooks.json"]
 }
 ```
 
@@ -66,9 +72,12 @@ task name, one declaration pointer and the exact seven-field report skeleton.
 It emits no model, reasoning, provider, authentication, permission or profile
 override. Authentication is not read from credential stores.
 
-When badges are required, start a bounded read-only Habblaud observer **before**
-beginning the attempt. Record its start time. Observe real sessions; never create
-synthetic hook events or rewrite native/Habblaud state.
+`display_required` is optional and defaults to `false`. Standard upgrades omit
+it and the update plan's `display` layer. Only an explicit user request for a
+consumer display test adds that requirement. Read the [optional consumer guide](native-display.md)
+for its observer and evidence contract; do not load it during ordinary upgrades.
+For an already installed optional adapter, run its disposable contract tests to
+check role precedence and binding without connecting to a consumer.
 
 ## Consume exactly one attempt
 
@@ -101,28 +110,13 @@ unrecognized layouts remain unqualified.
 {
   "record_path": "/private/update/app-probe.json",
   "child_log": "/absolute/real-child-rollout.jsonl",
-  "display_evidence": "/private/update/app-display.json",
   "dispatch_evidence": "/private/update/app-dispatch.json"
 }
 ```
 
 Omit `child_log` when the response is denied or uncertain. Reconcile the same
-consumed attempt after locating evidence; never redispatch. Omit `display_evidence`
-when unobserved: required display remains incomplete. Its observation has this
-shape, with actual timestamps expressed as Unix seconds:
-
-```json
-{
-  "client": "app",
-  "parent_thread_id": "native-parent-thread-id",
-  "child_thread_id": "actual-child-thread-id",
-  "role": "Tester",
-  "observed_label": "Tester",
-  "observer_started_at": 1000.0,
-  "observed_at": 1010.0,
-  "source": "habblaud"
-}
-```
+consumed attempt after locating evidence; never redispatch. Default qualification
+uses native logs and the dispatch capture only. No consumer observation is needed.
 
 Some native clients encrypt message text in disk logs. Every visible dispatch field
 must still match the prepared packet. For encrypted text, `dispatch_evidence` must
@@ -134,17 +128,15 @@ must match the prepared packet. Without it, encrypted text remains unverified an
 the probe cannot pass. Do not derive a purported observed capture from the plan
 alone. Plaintext logs need no separate capture.
 
-Retain a bounded actual API/UI snapshot with the observation. `snapshot` may name
-that supporting artifact. The display record is an external observation; Python
-checks its correlation and timing, not whether a person truthfully observed UI.
-The adapter fills only absent/null `agent_role`; any supplied value wins.
-
-`execution_passed`, `protocol_passed`, `recovery_observed`, `settings_preserved`
-and `display_passed` remain separate. A corrected invalid first report cannot
-become a clean first-pass result. `complete` requires execution and first-pass
-protocol, plus display when requested. Authentication remains `not_exposed`;
-unchanged provider/permissions and absent overrides do not prove credential
-identity. A worker's report alone never establishes client qualification.
+`execution_passed`, `protocol_passed`, `recovery_observed` and `settings_preserved`
+remain separate. A corrected invalid first report cannot become a clean first-pass
+result. `complete` requires execution and first-pass protocol; optional display
+also gates completion only when explicitly requested. `display_passed: false`
+means unobserved when no display was requested, not an upgrade failure. Omit
+unrequested display results from user-facing upgrade reports.
+Authentication remains `not_exposed`; unchanged provider/permissions and absent
+overrides do not prove credential identity. A worker's report alone never
+establishes client qualification.
 
 `status-probe` reads the same record and checks applicability without another
 dispatch. It verifies immutable evidence hashes and captured log prefixes while

@@ -12,7 +12,7 @@ authorization policy. No machine-specific endpoint, account or model choice is e
 The [delegation policy and execution contract](delegation-brief.md) explains
 [roles alongside specialties](delegation-brief.md#role-and-specialty),
 [task/specialty requirements](delegation-brief.md#task-and-specialty-guide),
-[Habblaud badge compatibility](delegation-brief.md#role-visibility-in-habblaud),
+[native role metadata](delegation-brief.md#native-role-metadata),
 [optional native display adapter](native-display.md),
 [demonstrated ability versus runtime capacity](delegation-brief.md#demonstrated-ability-versus-runtime-capacity),
 [local-first route selection](delegation-brief.md#choose-the-execution-route),
@@ -81,8 +81,11 @@ delivery in one private record. It freezes a complete candidate, preserves owned
 baselines/customizations, resumes interrupted writes and reports unmet outcomes.
 It does not enroll unrelated repositories or infer native trust from file hashes.
 Use the [single-attempt qualification helper](qualification.md) in each requested
-client. Actual execution, first-report validity and Habblaud display have separate
-results. A no-op needs no new writes or probes when applicable evidence is valid.
+client. Standard upgrades validate trusted hooks, exact dispatch identity,
+role/specialty metadata, first-report validity and inherited settings. No external
+display service is required or mentioned in the upgrade flow. Consumer testing is
+separate and runs only on an explicit request. A no-op needs no new writes or
+probes when applicable evidence is valid.
 
 The skill drives the full Prompt 12 procedure; the sections below supply the
 portable implementation details. The pinned package baseline above describes its
@@ -215,7 +218,7 @@ The initial check exits 1 when files need installation; 0 means unchanged; 2 mea
 an error or a conflict requiring review. Installation creates only these paths:
 
 - `.codex/hooks/subagents.py`: bounded standard-library event handler.
-- `.codex/hooks/native_display.py`: inert optional Habblaud display adapter;
+- `.codex/hooks/native_display.py`: inert optional event metadata adapter;
   [explicit integration](native-display.md) is separate from guard installation.
 - `.codex/native-display.md`: setup, rollback and qualification instructions for that adapter.
 - `.codex/delegation-brief.md`: user-readable policy and native hook contract.
