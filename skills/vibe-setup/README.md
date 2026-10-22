@@ -12,6 +12,11 @@ under `skills/vibe-setup/`. Keep reusable changes in that repository and adoptio
 records in each consuming project's own documentation. The installed skill is
 self-contained and does not depend on a consuming project's checkout or policies.
 
+The source package also provides Phase 1 [task worktree inspection and startup](task-lifecycle.md)
+through `workflow.py`. It is invoked explicitly; installation, PR automation and
+automatic client integration are not implemented yet. The existing installer
+still installs only the subagent component.
+
 Source baseline: [Vibe Prompt 12 at `790a895`](https://github.com/soumatheusgomes/vibe-coding-toolkit/blob/790a895304e0c08b70a5b215c9d334f1c86b816c/docs/prompts/12-existing-project-setup.md).
 Use that complete prompt for the surrounding setup, not only this subagent package.
 On an update, resolve upstream once and record its immutable revision. Compare
