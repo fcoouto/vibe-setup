@@ -67,12 +67,17 @@ into Vibe or apply newer repository instructions to an older installation implic
    [installation and trust](README.md#2-review-and-apply-the-subagent-package).
    Reconcile project instructions using [the template](AGENTS.md.template).
    Apply the [delegation policy](delegation-brief.md), including local eligibility,
-   task/specialty requirements, demonstrated ability versus runtime capacity,
+   role/specialty assignments, demonstrated ability versus runtime capacity,
    model discovery, bounded native fallback and coordinator verification. Mark
    specialties without matching model/task evidence **Not assessed**. Link it
    from the target's existing `AGENTS.md` and documentation entry point; record
    effective routes and qualification evidence privately. Keep each file under
    one writer and preserve permitted model/authentication.
+   The main agent is Coordinator. Assign each worker a role from the guide and
+   a separate specialty; carry both through local execution and native fallback
+   using the installed contract. Roles never select native profiles or change
+   model, effort, provider or permissions. Dashboard delivery requires separate
+   evidence; follow the guide's compatibility limits without modifying Habblaud.
    Install the template's normal-task lifecycle instructions into the project's
    existing guide, resolving the actual installed helper path. Routine tasks use
    those instructions directly; they must not repeat complete Vibe onboarding.

@@ -160,6 +160,44 @@ class GuardTests(unittest.TestCase):
                 self.assertIsNone(re.search(matcher, name))
                 self.assertEqual(self.run_hook(event(tool_name=name, tool_input=None)), {})
 
+    def test_role_and_specialty_are_optional_without_rewriting_native_settings(self):
+        for metadata in ({}, {"specialty": "Security-sensitive work"},
+                         *({"role": role} for role in
+                           ("Coordinator", "Scout", "Builder", "Tester", "Reviewer", "Scribe", "Investigator")),
+                         {"role": "Reviewer", "specialty": "Security-sensitive work"},
+                         {"role": "Builder", "specialty": "x" * 4096}):
+            with self.subTest(metadata=metadata):
+                self.write_brief(dict(BRIEF, **metadata))
+                before = self.record.read_bytes()
+                data = event(tool_input={"task_name": "parser_fix", "message": "PRIVATE_SENTINEL",
+                                         "model": "untouched", "reasoning_effort": "unchanged"})
+                self.assertEqual(self.run_hook(data), {})
+                self.assertEqual(self.record.read_bytes(), before)
+
+    def test_invalid_role_and_specialty_are_denied(self):
+        for field, values in {
+            "role": (None, False, 1, [], {}, "", " ", "builder", "Builder ", "Wizard", "x" * 4097),
+            "specialty": (None, False, 1, [], {}, "", " \n ", "x" * 4097),
+        }.items():
+            for value in values:
+                with self.subTest(field=field, value=value):
+                    self.write_brief(dict(BRIEF, **{field: value}))
+                    self.deny(event())
+
+    def test_role_metadata_does_not_relax_scope_or_required_fields(self):
+        tagged = dict(BRIEF, role="Coordinator", specialty="Implementation")
+        for key in BRIEF:
+            brief = dict(tagged)
+            del brief[key]
+            self.write_brief(brief)
+            self.deny(event())
+        for updates in ({"read_only": True}, {"allowed_files": []}, {"model": "override"},
+                        {"permission_mode": "override"}, {"extra": 1}):
+            self.write_brief(dict(tagged, **updates))
+            self.deny(event())
+        self.write_brief(dict(tagged, read_only=True, allowed_files=[]))
+        self.assertEqual(self.run_hook(event()), {})
+
     def test_non_native_spawn_suffix_tools_are_not_intercepted(self):
         config = json.loads((ROOT / ".codex/hooks.json").read_text())
         matcher = config["hooks"]["PreToolUse"][0]["matcher"]
