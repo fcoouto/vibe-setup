@@ -1,7 +1,9 @@
 # Native Codex delegation contract
 
-Use native subagents with the active client's model, reasoning, provider and
-authentication. Before dispatch, the coordinator creates a plain JSON declaration
+Use native subagents with the active client's provider, authentication and
+permissions. Inherit the coordinator's model and reasoning unless the user
+authorizes a scoped capability choice, such as the cleanup profile below.
+Before dispatch, the coordinator creates a plain JSON declaration
 at the active harness root's `.codex-delegations/<task_name>.json`. This directory
 is beside
 `.codex`, outside the protected configuration directory. `task_name` must contain
@@ -102,6 +104,43 @@ An independent reader's `.codex-delegations/parser_review.json` for native
   "budget": {"minutes": 10, "attempts": 1}
 }
 ```
+
+## Lightweight cleanup worker
+
+Post-merge cleanup must remain inexpensive. Use one bounded native worker on a
+lightweight compatible model available in the current authenticated client.
+Choose from the host's supported models and reasoning settings; do not hard-code
+a model family or version. Keep the coordinator's model/settings unchanged. Never
+add a provider, proxy, API billing path or credentials to obtain a cheaper model.
+If no suitable native choice is available, report the limitation and offer the
+helper's manual invocation; do not silently upgrade to an expensive worker.
+
+Python performs the factual safety checks and ordered deletions. The worker runs
+one lifecycle `resume` invocation from outside the target worktree, using the
+existing event ID and a fresh report of worktree ownership and stopped writers.
+The helper confirms every associated PR merged, checks the local worktree and
+branch identities, deletes remote refs conditionally, verifies absence, then
+removes the exact worktree without force. The worker must never substitute its
+own recursive deletion, force push, stale receipt or approval assertion.
+
+Declare a three-minute, one-attempt budget. Scope writable resources to the exact
+worktree, its recorded remote refs and its Git-common-directory lifecycle record;
+use `read_only=false` because cleanup has authorized mutations. Keep other tasks,
+branches, the primary checkout and local branch refs outside that scope. Respect
+`auto_cleanup=false` and whole-lifecycle opt-out before any deletion.
+
+Do not inspect the codebase, rerun project tests/builds, repeat independent review,
+spawn other workers, poll GitHub or create a recurring task for cleanup. Trigger
+only when reconciliation first observes merges, including after a human merge
+report. On a pending result, report the precise manual action and stop; retry only
+after new evidence or the requested action. Completed cleanup uses its recorded
+result and does not start another worker merely to recheck unchanged state.
+
+Return the existing compact report schema: observed merged PR count, remote refs
+confirmed absent, worktree removal status, evidence reference and any pending
+action. The coordinator reads that result and the bounded helper evidence; it does
+not repeat the full cleanup investigation with a larger model. These are workflow
+instructions, not hook-enforced model routing or proof of host ownership.
 
 ## Declaration schema
 

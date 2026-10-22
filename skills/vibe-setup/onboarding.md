@@ -33,8 +33,9 @@ Existing model, reasoning, provider, authentication and permission settings are
 preserved. Compatible agent settings and unrelated hook groups survive. Existing
 customized managed scripts/contracts and incompatible configuration require
 explicit reconciliation before any recipe file is written. Existing lifecycle
-opt-out is preserved; absent policy defaults to enabled. Automatic cleanup and
-its separate default-on opt-out setting are planned for Phase 3, not enabled here.
+opt-out is preserved; absent policy defaults to enabled. Cleanup defaults ON;
+`auto_cleanup=false` preserves resources after merge. Phase 3 provides explicit
+[publication and cleanup](task-lifecycle.md) operations from the reviewed package.
 
 ## Preview, apply, resume
 
@@ -127,7 +128,8 @@ separate authorized setup step. The helper does not change installed user skills
 global client settings, credentials or trust. App and VS Code validation remains
 separate evidence; these filesystem tests do not qualify either client.
 
-Phase 3 will automate PR synchronization and cleanup. Until then, the coordinator
+Phase 3 now provides explicit PR synchronization and cleanup. The coordinator
 uses the established `[BLOCKED]`/`[READY]` rules and concrete manual delivery steps.
 Cleanup must confirm every associated PR merged, delete and verify remote branches
-first, then remove the local worktree. This phase performs none of those deletions.
+first, then remove the local worktree. Setup itself performs none of those deletions;
+cleanup runs only through explicit lifecycle reconciliation.

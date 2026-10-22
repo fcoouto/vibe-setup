@@ -115,6 +115,14 @@ After any manual action, reread accessible Git/PR facts and record observed vers
 
 ## Automatic cleanup after merge
 
+Keep cleanup inexpensive. Deterministic Python performs the required Git/API and
+filesystem checks. When an agent is needed, dispatch one bounded native worker on
+a lightweight compatible model available in the current client; never hard-code a
+model name. Preserve the coordinator's model, provider, authentication and
+permissions. Use a small budget and compact result; do not rerun project tests,
+review the codebase, poll or silently fall back to an expensive model. The subagent
+contract defines this cleanup profile without adding a routing service.
+
 When lifecycle reconciliation (`sync` or `resume`) confirms that **every PR associated with a worktree is merged**, run the cleanup task unless `auto_cleanup=false`. This runs when merge confirmation is observed, including after the user reports a merge; it does not add a background daemon or polling service. Onboarding explains the default and exposes the opt-out without repeatedly requesting approval for an already-authorized cleanup.
 
 Reconcile the complete task-owned PR/branch inventory from durable records and paginated remote lookup, including prior branches and PRs for that worktree. Require at least one PR and an observed merged state for every associated PR. Open, draft, closed-but-unmerged, missing, ambiguous or inaccessible PR state prevents automatic cleanup. Local branch ancestry alone is not proof of a merged PR, especially after squash/rebase merges. If the inventory or merge status cannot be verified, preserve resources and give concrete manual recovery instructions.

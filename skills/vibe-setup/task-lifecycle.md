@@ -1,9 +1,10 @@
-# Task worktrees and recoverable setup
+# Task worktrees, publication and cleanup
 
 The source package now provides read-only inspection and verified worktree
 startup through `workflow.py`. Phase 2 adds [recoverable recipe setup](onboarding.md)
-in the verified worktree, including the lifecycle policy. PR synchronization and
-automatic skill/client wiring remain later phases. The existing `install.py`
+in the verified worktree, including the lifecycle policy. Phase 3 adds recoverable
+PR synchronization and ordered cleanup. Automatic skill/client wiring remains
+Phase 4. The existing `install.py`
 still installs only the subagent component; it does not install the helper or
 policy asset. Run the helper from the complete reviewed package.
 
@@ -101,12 +102,146 @@ contain no credentials and are bookkeeping, not a tamper-proof enforcement
 boundary. Leave them in place when an operation is interrupted.
 
 Missing Git/PR access is a publication prerequisite. It does not prevent verified
-local work. The helper does not yet push, create PRs or claim delivery readiness. The
-coordinator currently handles publication under the approved rules: start PRs
-as `[BLOCKED]`, attempt one synchronization per phase, preserve human text, and
-promote to `[READY]` only after non-draft status and applicable merge requirements
-are established. If automation fails, provide concrete manual actions and state
-what remains unverified. Never merge automatically.
+local work. The helper uses the existing Git transport and authenticated GitHub
+CLI; it never logs in, switches accounts or changes credentials. The coordinator
+prefers sufficient connected tools when available and can use the same structured
+inputs for manual publication. Never merge automatically.
+
+## Synchronize one planned milestone
+
+Use one to four routine checkpoints, or one synchronization per declared phase.
+Keep stable milestone IDs and one event UUID per synchronization, including retries.
+A blocker event records the cause and resumption condition. Stop writable workers
+before taking a snapshot; update the PR before reporting in chat. If publication
+fails, report the blocker with “PR update pending” and the concrete manual action.
+
+Inspect explicit publishable files with `inspect WORKTREE --task-id TASK_UUID
+--file relative/path` (repeat `--file`). Retain `publication_snapshot.digest` and
+collect checks/review evidence for that exact snapshot. Exclude credentials and
+private task records. Do not stage unrelated changes. The helper verifies supplied
+evidence fingerprints; outcomes and writer/host ownership remain coordinator
+reports, not an independent test runner or host attestation.
+
+Pass `sync WORKTREE` JSON through stdin with exactly `task_id` and `event`.
+The event contains these required fields:
+
+| Fields | Contract |
+| --- | --- |
+| `event_id`, `kind`, `milestone` | UUID; `checkpoint`, `blocker`, `ready` or `reopen`; planned ID |
+| `schedule` | `{"mode":"phases","ids":["phase-1","phase-2"]}` or `checkpoints` with at most four IDs |
+| `publication` | Explicit `host`, `repository` (`owner/repo`), `remote`, `base`, expected GitHub `actor`, and every task-owned `branches` name, including prior branches |
+| `usage` | Fresh `{"kind":"git","scope":"exclusive","writers":[]}`; list each owned writer as `{"id":"worker","state":"stopped"}`; use `managed`, `shared` or `pinned` when applicable |
+| `files`, `snapshot`, `message`, `title` | Explicit relative file list, inspected digest, commit message, PR title |
+| `summary`, `progress`, `remaining`, `blockers` | Human-readable text; blocker text includes its resumption condition; `ready` requires no blockers |
+| `validation` | `snapshot` matching the event, `checks` list and one independent `review` entry |
+
+Each validation entry contains exactly `name`, `outcome` (`passed`, `failed` or
+`not_run`), `path` (private evidence file), and its SHA-256 `sha256`. A `ready`
+event requires at least one check and an independent review, all passed. Keep
+request/evidence files outside tracked source; requests are limited to 64 KiB.
+The task's schedule and publication identity remain fixed after first use;
+changed branches or destinations require explicit reconciliation of the inventory.
+
+The helper commits only the named files, pushes normally without force, verifies
+the remote commit and looks up every matching PR before creation. New PRs start
+draft with `[BLOCKED]`. One marked body section contains summary, progress,
+validation, remaining work and blockers. Human title suffixes and text outside
+that section survive updates. Edited, missing, malformed or foreign managed
+sections require reconciliation.
+
+A PR may leave draft while still `[BLOCKED]` to receive reviews. `[READY]` requires
+current local evidence, confirmed non-draft status and observed passing checks,
+reviews and mergeability for the exact head. Unknown remote facts remain pending.
+Before further edits to a ready PR, send `reopen` and verify `[BLOCKED]`; failure
+pauses that PR's implementation. Other publication failures can leave verified
+local work available without claiming synchronized delivery. A no-diff task
+creates neither an empty commit nor a PR. Attach a published PR to the native
+chat when that capability is available.
+
+## Resume publication or manual actions
+
+Resume from an existing checkout, preferably the source outside the task worktree:
+
+```sh
+python3 -B /path/to/vibe-setup/workflow.py resume /absolute/source < resume.json
+```
+
+For lifecycle events, provide `{"operation_id":"EVENT_UUID","usage":...}` with
+a fresh ownership/writer report. Setup-only resume retains its Phase 2 interface. For an already delivered event,
+resume performs merge/cleanup reconciliation without requiring old build/review
+logs. If PRs remain open it reports cleanup pending. Use the original `sync`
+request when publication itself needs verification again.
+The helper looks up remote state before repeating mutations. An uncertain create
+with no observed PR requires human lookup; it never creates another PR blindly.
+An interrupted commit/push/update reuses the existing event and observed outcome.
+Do not delete recovery records to bypass a conflict.
+
+Failure output names the actual worktree, branch, base, commit, PR/event identity
+and quoted lookup/push commands. Look for an existing PR first; publish the named
+commit, update the managed section, use **Ready for review** if needed, confirm
+requirements, then apply `[READY]`. For a readiness withdrawal, restore `[BLOCKED]`
+before changing implementation. Rerun the same event after the action.
+
+When remote access remains unavailable, `resume` accepts an additional
+`confirmation` object with `actor`, current committed `head`, positive `pr_number`
+and `actions: ["publication","metadata","non_draft","readiness"]`. The user
+must explicitly confirm those actions. The result says `delivery=user_confirmed`;
+it never claims those remote facts were independently observed. Confirmation
+cannot override observed draft/failing readiness or publish uncommitted work, and
+cannot authorize automatic cleanup without independently observed merges.
+
+If an existing READY claim pauses work and remote access remains unavailable,
+the user can instead confirm `actions: ["readiness_withdrawal"]`, naming the
+known PR and its current published head after manually restoring `[BLOCKED]`.
+This narrowly unpauses local work with `delivery=user_confirmed`; publication
+remains unverified and cleanup remains unauthorized without observed merges.
+An unresolved READY-update intent also pauses work: a lost response may hide a
+successful promotion. Do not continue until withdrawal is observed or confirmed.
+
+Lifecycle records live under `<git common directory>/vibe-setup/lifecycle/`,
+outside the removable folder. An advisory lock serializes cooperating helpers.
+GitHub metadata writes have no compare-and-swap guarantee: the helper rereads
+latest text, preserves human content and verifies exact readback, but a concurrent
+edit between read and write remains a race. Reconcile observed conflicts manually.
+The helper is cooperative automation, not an interceptor for arbitrary tools.
+
+## Inexpensive cleanup after merge
+
+Cleanup defaults ON. Trigger once when synchronization first observes all merges,
+including after the user reports a merge; do not poll or start a recurring task.
+Use the [lightweight cleanup worker](delegation-brief.md#lightweight-cleanup-worker)
+profile: one simpler compatible native model, three minutes and one attempt,
+compact result, no project tests/builds or code review. Python performs the checks.
+No fixed model name, new billing/provider path or silent expensive fallback.
+
+Run from outside the target worktree, with a fresh report that all writers stopped
+and the task exclusively owns it. Explicitly registered branches plus paginated
+PR lookup must establish the complete, nonempty inventory. Every associated PR
+must be observed merged and owned by this task; missing/inaccessible/ambiguous
+history blocks deletion. Historical worktrees without that inventory need manual
+reconciliation and are never enrolled through a broad sweep.
+
+The helper preserves dirty, untracked and ignored files, extra commits, active or
+unknown writers, shared/pinned/foreign/primary worktrees, and default/protected/
+shared/advanced/recreated branches. Native managed worktrees require the host's
+lifecycle action; the helper returns a manual step rather than removing them.
+Host ownership is reported by the coordinator; Git facts are checked directly.
+
+For eligible Git worktrees it deletes each remote branch with an expected-head
+lease, verifies every branch absent, then uses non-force Git worktree removal.
+It retains local branch refs. Remote deletion never follows local removal.
+Partial progress is durable outside the removed folder. Resume from the source
+with the same event ID and fresh usage; a recreated branch is preserved even when
+its commit matches the old one. A completed receipt reports historical completion
+without starting another worker merely to recheck unchanged state.
+
+`cleanup=pending` is separate from `delivery=merged`. On failure, preserve remaining
+resources, name the exact action and stop. Retry after new evidence or the action.
+If manual cleanup is needed, verify the full PR inventory and ownership, remove
+only eligible remote branches, confirm absence, then remove the clean worktree
+through its owning Git/native host. Never substitute recursive or forced removal.
+Local/ref checks reduce races but cannot prevent unrelated processes from writing;
+stop writers first and retain ambiguous resources.
 
 ## Explicit opt-out
 
@@ -118,7 +253,12 @@ schema_version = 1
 
 [task_lifecycle]
 enabled = true
+auto_cleanup = true
 ```
+
+Set `auto_cleanup=false` to keep remote branches and the worktree after merge.
+Both the source and task-worktree preference are checked; either opt-out prevents
+deletion. Preserve that choice through setup, upgrades and resume.
 
 Preserve an explicit `enabled=false` in the selected source checkout. Startup
 then reports `implementation=disabled` and creates no worktree or task state.
