@@ -245,9 +245,22 @@ def candidate_reason(candidate, request, difficulty, now, wf, refs):
         if "manifest" not in request:
             return "Evaluation or canary authority is absent"
         manifest = evidence(request["manifest"], wf, refs, True)
-        fields(manifest, ("mode", "candidate_ids", "authorization_ref", "expires_at", "max_calls", "used_calls", "scope",
+        fields(manifest, ("mode", "candidate_bindings", "authorization_ref", "expires_at", "max_calls", "used_calls", "scope",
                           "case_refs", "rubric_ref", "stop_conditions", "disposable"), ("diagnosis_ref",))
-        strings(manifest["candidate_ids"], True)
+        bindings = manifest["candidate_bindings"]
+        if not isinstance(bindings, dict) or not 1 <= len(bindings) <= 64:
+            raise ValueError("Manifest must freeze a bounded candidate binding map")
+        for identity, authorized in bindings.items():
+            text(identity)
+            fields(authorized, ("route", "model", "effort", "provider", "version", "client", "client_version", "tool"), ("runtime_digest",))
+            for value in authorized.values():
+                text(value)
+            if authorized["route"] not in ("local", "native") or (("runtime_digest" in authorized) != (authorized["route"] == "local")):
+                raise ValueError("Manifest must bind the exact route and local runtime when applicable")
+            if "runtime_digest" in authorized and not re.fullmatch(r"[a-f0-9]{64}", authorized["runtime_digest"]):
+                raise ValueError("Manifest local runtime digest is invalid")
+        if bindings.get(candidate["id"]) != binding:
+            return "Manifest candidate binding changed; obtain a new bounded authorization"
         strings(manifest["case_refs"], True)
         strings(manifest["stop_conditions"], True)
         boolean(manifest["disposable"])
@@ -255,7 +268,7 @@ def candidate_reason(candidate, request, difficulty, now, wf, refs):
         integer(manifest["used_calls"], 0, 1000)
         for ref in (manifest["authorization_ref"], manifest["rubric_ref"], *manifest["case_refs"]):
             evidence(ref, wf, refs)
-        if (manifest["mode"] != mode or candidate["id"] not in manifest["candidate_ids"] or timestamp(manifest["expires_at"]) <= now
+        if (manifest["mode"] != mode or timestamp(manifest["expires_at"]) <= now
                 or manifest["used_calls"] >= manifest["max_calls"] or not scope_matches(manifest["scope"], task, difficulty)):
             return "Bounded manifest does not authorize another matching call"
         if mode == "canary":

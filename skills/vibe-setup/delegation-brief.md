@@ -15,7 +15,7 @@ instructions govern both routes; availability alone grants no authority.
 - [Difficulty-based worker selection](#difficulty-based-worker-selection)
 - [Role and specialty](#role-and-specialty)
 - [Task and specialty guide](#task-and-specialty-guide)
-- [Role visibility in Habblaud](#role-visibility-in-habblaud)
+- [Native role metadata](#native-role-metadata)
 - [Demonstrated ability versus runtime capacity](#demonstrated-ability-versus-runtime-capacity)
 - [Discover models and check capacity](#discover-models-and-check-capacity)
 - [Local proposal and native fallback workflow](#local-proposal-and-native-fallback-workflow)
@@ -196,7 +196,7 @@ Test policy boundaries deterministically, then qualify App and VS Code separatel
 with the [native qualification](https://github.com/fcoouto/vibe-setup/blob/main/skills/vibe-setup/qualification.md) procedure from the installed
 package. A selected worker must demonstrably use the requested model/effort while
 the Coordinator remains unchanged. Inherited smoke tests, CLI runs, unit fixtures,
-installation and Habblaud labels cannot establish that client result. Model-control
+installation and display labels cannot establish that client result. Model-control
 qualification also does not establish task competence or savings.
 
 Compare identical delegated assignments with inherited versus selected workers to
@@ -327,70 +327,37 @@ first does not establish ability for the others. Successful implementation also
 does not establish review ability. A bounded subtask can qualify without granting
 the model a broad specialist title.
 
-## Role visibility in Habblaud
+## Native role metadata
 
-Role declarations guide agents; they do not automatically populate a dashboard.
-The optional [native display adapter](native-display.md) forwards a bound assignment
-role through the existing Habblaud hook when native `agent_role` is absent or null.
-It preserves any supplied native role and does not change Habblaud or execution
-settings. Installation and live delivery require separate qualification.
-Keep Habblaud unchanged and qualify its existing input path separately. Inspection
-and disposable source/DOM probes against Habblaud 1.0.3
-([`faa1a012`](https://github.com/marmottajr/habblaud/tree/faa1a012b5fbf632c66dc6801c5383e53a542406))
-on 2026-10-22 established the following behavior; recheck it when the installed version changes:
+Role declarations guide agents. The native dispatch must carry the exact
+`task_name` and bind the resulting child to its parent and harness root. Keep the
+canonical role and nonempty specialty in the declaration; unknown roles are
+rejected and custom specialties remain **Not assessed** without matching evidence.
 
-| Path | Observed behavior |
-| --- | --- |
-| Native child rollout | Habblaud reads `agent_role` or `agent_type` from supported spawn metadata; role text is limited to 40 characters. |
-| Existing Codex hook endpoint | A child's first `agent_type` can supply the visible role. A longer composite survives the hook path. |
-| Already visible child | The displayed role stays fixed. Later hooks or newly discovered rollout role metadata do not relabel it. A rollout role seen first takes precedence over the hook label. |
-| Main agent | Source and badge rendering use fixed main-agent labels. `Coordinator` is an assignment role, but this version cannot display it as the main badge through these inputs. |
+Normal setup and upgrades validate the trusted project hook definitions and
+scripts, complete dispatch arguments, actual child identity, declaration reads,
+first report and inherited execution settings. Use `qualification.md` beside the
+installed Vibe Setup `workflow.py` for that bounded producer check; resolve the
+installed helper location from this project's setup instructions. This establishes the inputs a downstream consumer
+can read; it does not establish that a consumer received or displayed them.
 
-The [rollout parser](https://github.com/marmottajr/habblaud/blob/faa1a012b5fbf632c66dc6801c5383e53a542406/server/sources/codex/rollout.ts),
-[Codex source](https://github.com/marmottajr/habblaud/blob/faa1a012b5fbf632c66dc6801c5383e53a542406/server/sources/codex/source.ts)
-and [badge renderer](https://github.com/marmottajr/habblaud/blob/faa1a012b5fbf632c66dc6801c5383e53a542406/client/src/ui/widgets.ts)
-are the compatibility references. These fixtures establish parsing and rendering,
-not delivery from every Codex client or a live Docker/Node installation.
+If an existing optional event adapter is installed, verify its input contract
+with the package's adapter tests. Derive `agent_role` only when absent or null;
+any supplied value wins, including a value provided by a later runtime. Validate
+parent/child/task binding and preserve unrelated fields and execution settings.
+These disposable contract tests are separate from actual native execution.
+Do not install or activate a consumer integration as part of an ordinary upgrade.
 
 Inspect the active client's actual spawn schema. A native `agent_type` may select
-a configuration profile with different models or permissions; never use one just
-to obtain a badge. When a client exposes no independent role metadata field,
-retain the role in the declaration/instructions. The optional adapter can supply
-the missing display label; without observed delivery, report it as unverified.
-Do not invent spawn parameters, rewrite session logs,
-change native profiles or emit synthetic workers to conceal that limitation.
+a configuration profile; never use it solely to label an assignment. Do not invent
+spawn parameters, rewrite session logs or emit synthetic live workers. If the
+native interface lacks independent role metadata, preserve the declaration and
+report the producer limitation without changing model, reasoning or permissions.
 
-Native and local workers use the same display format:
-`<Role> · <Model Display Name>`, for example `Reviewer · Qwen3.8 27B Splash`.
-Use the explicit assignment role and the human-readable name of the actual
-attempt's model: display `Qwen3.8 27B Splash`, not `qwen3.8-27b-splash`. Prefer
-existing model display metadata; otherwise format the actual model identifier
-for display without changing its stored identity or selection. Do not add a
-`LOCAL` marker, provider, route or specialty to the badge. Keep role and specialty
-separate in assignment metadata. For legacy assignments without a role, display
-`Unspecified role`; this is a display placeholder, not a stored role value.
-Do not infer the role from the model name or execution route.
-
-For local workers, the plugin owns the existing-hook adapter and sends the full
-display label on the first observation of the real attempt. Pass the canonical
-role and specialty separately to that adapter. Keep the complete values in the
-assignment metadata: Habblaud can visually ellipsize long badges from the right,
-and native rollout parsing has the 40-character limit above. Hover text retains
-the full hook label. These transport limits do not authorize a different label
-format for local and native workers.
-
-Native session data can also populate the agent's **Stats > Model** field.
-The existing Codex hook endpoint ignores the event's `model` field, so hook-only
-local workers cannot populate it through that path. Keep Habblaud unchanged and
-report local model Stats as unavailable; the badge's model display name does not
-establish Stats support. Do not fabricate native session data to fill that field.
-
-Existing hooks still attach local characters to the Codex provider/account.
-Stop, interruption and expired hook presence can
-look like successful completion. A role label does not fix these identity or
-lifecycle limitations; the plugin must document them and own transport testing.
-Vibe neither installs that adapter nor changes local routing. Coordinator badge
-support remains unavailable under the unchanged-Habblaud constraint.
+Only load the [optional consumer compatibility guide](native-display.md) when the
+user explicitly requests that consumer's setup or test. Keep that result separate
+from the ordinary hooks and subagent dispatch validation. Do not introduce named
+consumer products into default upgrade messages or completion requirements.
 
 ## Demonstrated ability versus runtime capacity
 

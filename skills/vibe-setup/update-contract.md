@@ -47,8 +47,7 @@ symlinks. Files must be regular. Python 3.11+, Git and POSIX locking are require
   ],
   "requirements": [
     {"root": "/projects/example", "layer": "execution", "client": "app"},
-    {"root": "/projects/example", "layer": "protocol", "client": "app"},
-    {"root": "/projects/example", "layer": "display", "client": "app"}
+    {"root": "/projects/example", "layer": "protocol", "client": "app"}
   ]
 }
 ```
@@ -154,10 +153,16 @@ launches a probe or creates a publication request.
 
 ## Record outcomes and determine completion
 
-Required layers are `tests`, `review`, `installation`, `activation`, `discovery`,
+Supported outcome layers are `tests`, `review`, `installation`, `activation`, `discovery`,
 `execution`, `protocol`, `display`, `publication`, `remote_access`, `cleanup`,
 `exclusions`, and `release`. Client layers are discovery, execution, protocol,
 display and exclusions; all other layers use `client: null`.
+
+Standard client qualification requires discovery, execution and protocol evidence
+for hooks and native subagent dispatch. Add `display` only for an explicitly
+requested consumer test; its absence is not a missing upgrade requirement. Do not
+introduce consumer product names or display prompts into routine upgrade reports.
+Frozen plans retain any previously explicit display requirement.
 
 Installation is automatically required for selected writable destinations.
 Project activation is recorded separately. A publication requirement adds an

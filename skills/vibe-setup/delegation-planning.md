@@ -98,8 +98,11 @@ plugin's supported interface; Vibe cannot grant these approvals. Recheck admissi
 immediately before dispatch. Planning neither reserves capacity nor enables routing.
 
 Evaluation and canary modes require an absolute `manifest` file with `mode`,
-`candidate_ids`, `authorization_ref`, `expires_at`, `max_calls`, `used_calls`,
+`candidate_bindings`, `authorization_ref`, `expires_at`, `max_calls`, `used_calls`,
 `scope`, `case_refs`, `rubric_ref`, `stop_conditions` and boolean `disposable`.
+`candidate_bindings` maps each candidate ID to its complete exact `binding`
+object above, including client/tool versions and local runtime digest. An ID
+cannot be retargeted to a different configuration under the same manifest.
 Calls need remaining budget and matching scope. Canary requires `pilot_only`, a
 passing pilot, review, at most ten calls, no failed/rescued existing cohort member,
 and disposable R2 work. Suspended evaluation also requires `diagnosis_ref`.

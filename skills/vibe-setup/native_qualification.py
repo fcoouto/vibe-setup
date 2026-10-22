@@ -174,10 +174,11 @@ def worker_selection(request):
     return selection
 
 
-def packet(root, name, tool, selection=None):
+def packet(root, name, tool, selection=None, *, legacy=False):
     skeleton = {"status": "done", "summary": "Describe the observed role, specialty, root and result.",
                 "changed_files": [], "checks": ["List actual read results."], "risks": [], "blockers": [],
-                "next_action": "Coordinator verifies native evidence and display."}
+                "next_action": ("Coordinator verifies native evidence and display." if legacy else
+                                "Coordinator verifies hooks and native dispatch evidence.")}
     settings_instruction = ("preserve inherited model, reasoning, provider, authentication and permissions. "
         if selection is None else
         f"use the explicitly selected worker model {selection['model']} and reasoning {selection['reasoning_effort']}; "
@@ -196,7 +197,8 @@ def packet(root, name, tool, selection=None):
 
 def prepare(root, request, wf):
     fields(request, ("record_path", "task_name", "parent_log", "client_context", "tool", "read_paths",
-                     "protected_files", "display_required"), ("worker_selection",))
+                     "protected_files"), ("display_required", "worker_selection"))
+    request = {"display_required": False, **request}
     if type(request["display_required"]) is not bool:
         raise ValueError("display_required must be boolean")
     name = request["task_name"]
@@ -282,7 +284,10 @@ def revalidate(record, root, wf, *, before_dispatch=False):
     selection = worker_selection(request)
     if selection != record.get("worker_selection"):
         raise ValueError("Prepared worker selection, authorization or host inventory changed")
-    args, skeleton = packet(root, request["task_name"], request["tool"], selection)
+    # Existing receipts retain their exact dispatched message across an upgrade.
+    legacy = (isinstance(record["report_skeleton"], dict)
+              and record["report_skeleton"].get("next_action") == "Coordinator verifies native evidence and display.")
+    args, skeleton = packet(root, request["task_name"], request["tool"], selection, legacy=legacy)
     if record["native_arguments"] != args or record["report_skeleton"] != skeleton:
         raise ValueError("Prepared native arguments changed; never dispatch overrides or a rebuilt message")
     contract = guard()
@@ -320,6 +325,25 @@ def verify_artifacts(refs, wf):
             raw = raw[:ref["bytes"]]
         if digest(raw) != ref["sha256"]:
             raise ValueError("Recorded native or display evidence changed; invalidate this qualification")
+
+
+def verify_worker_settings(record, wf):
+    if not record["result"].get("settings_preserved"):
+        return
+    refs = [ref for ref in record["result"]["evidence"]
+            if "bytes" in ref and ref["path"] != record["request"]["parent_log"]]
+    if len(refs) != 1:
+        raise ValueError("Cached worker settings require one bound native child log")
+    expected = dict(record["settings"])
+    selection = record.get("worker_selection")
+    if selection is not None:
+        expected.update(model=selection["model"], effort=selection["reasoning_effort"])
+    raw, _ = log_rows(refs[0]["path"], wf)
+    # The recorded prefix is immutable and already verified; inherited history
+    # inside that prefix must not count as new worker execution.
+    appended = [loads(line) for line in raw[refs[0]["bytes"]:].splitlines() if line.strip()]
+    if not settings_match(appended, expected):
+        raise ValueError("Worker settings changed after qualification; invalidate cached selection evidence")
 
 
 def output_strings(value):
@@ -508,8 +532,9 @@ def evaluate(record, request, wf):
             snapshot = read_file(display["snapshot"], wf, 16 * 1024 * 1024)
             result["evidence"].append({"path": display["snapshot"], "sha256": digest(snapshot)})
     result["complete"] = execution and protocol and (result["display_passed"] or not record["request"]["display_required"])
+    unmet = "execution, first-report or display" if record["request"]["display_required"] else "execution or first-report"
     result["next_action"] = ("Qualification passed; retain client-bound evidence." if result["complete"] else
-                             "Review unmet execution, first-report or display outcomes; this attempt is consumed.")
+                            f"Review unmet {unmet} outcomes; this attempt is consumed.")
     return result
 
 
@@ -529,6 +554,7 @@ def handle(operation, root, request, workflow):
         revalidate(record, root, wf)
         if record["result"]:
             verify_artifacts(record["result"]["evidence"], wf)
+            verify_worker_settings(record, wf)
         return {"status": "ok", "operation": operation, **(record["result"] or {
             "state": record["state"], "attempts": record["attempts"], "complete": False}), "evidence_ref": str(path)}
     if not path.parent.is_dir():

@@ -262,6 +262,52 @@ class NativeQualificationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.call("status-probe")
 
+    def test_cached_selection_rejects_appended_child_settings_drift_even_after_restoration(self):
+        self.select_worker()
+        self.prepare_begin()
+        request = self.completed_selected()
+        self.assertTrue(self.call("record-probe", request)["selection_verified"])
+        original = self.child.read_text()
+        settings = {**self.settings, "turn_id": str(uuid4()), "model": "selected-model", "effort": "low"}
+        for key, value in (("model", "different-model"), ("effort", "high"), ("approval_policy", "on-request")):
+            with self.subTest(key=key):
+                self.child.write_text(original)
+                self.append(self.child, "turn_context", {**settings, key: value})
+                self.append(self.child, "turn_context", settings)
+                with self.assertRaisesRegex(ValueError, "Worker settings changed"):
+                    self.call("status-probe")
+
+    def test_cached_selection_accepts_appended_matching_turns_without_rewriting_receipt(self):
+        self.select_worker()
+        self.prepare_begin()
+        self.call("record-probe", self.completed_selected())
+        original = self.record.read_bytes()
+        self.append(self.child, "turn_context", {**self.settings, "turn_id": str(uuid4()),
+                                                "model": "selected-model", "effort": "low"})
+        result = self.call("status-probe")
+        self.assertTrue(result["complete"])
+        self.assertTrue(result["selection_verified"])
+        self.assertEqual(self.record.read_bytes(), original)
+
+    def test_legacy_inherited_cache_needs_no_selection_fields_and_ignores_inherited_history(self):
+        self.request["display_required"] = False
+        self.prepare_begin()
+        request = self.completed()
+        rows = [json.loads(line) for line in self.child.read_text().splitlines()]
+        rows.insert(1, {"type": "turn_context", "payload": {**self.settings, "model": "older-parent-model"}})
+        self.child.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+        self.assertTrue(self.call("record-probe", request)["complete"])
+        record = json.loads(self.record.read_text())
+        for key in ("selection_verified", "coordinator_settings_preserved", "requested_worker_settings",
+                    "observed_worker_settings"):
+            record["result"].pop(key)
+        self.record.write_text(json.dumps(record))
+        self.append(self.child, "turn_context", {**self.settings, "turn_id": str(uuid4())})
+        self.assertTrue(self.call("status-probe")["complete"])
+        self.append(self.child, "turn_context", {**self.settings, "turn_id": str(uuid4()), "effort": "low"})
+        with self.assertRaisesRegex(ValueError, "Worker settings changed"):
+            self.call("status-probe")
+
     def test_selected_worker_read_evidence_before_own_turn_does_not_count(self):
         self.select_worker()
         self.prepare_begin()
@@ -289,6 +335,58 @@ class NativeQualificationTests(unittest.TestCase):
         result = self.call("record-probe", {**request, "dispatch_evidence": str(capture)})
         self.assertFalse(result["selection_verified"])
         self.assertFalse(result["complete"])
+    def test_default_upgrade_qualifies_native_dispatch_without_a_display_consumer(self):
+        self.request.pop("display_required")
+        self.call("prepare-probe", self.request)
+        self.call("begin-probe")
+        result = self.call("record-probe", self.completed())
+        self.assertTrue(result["complete"])
+        self.assertTrue(result["arguments_verified"])
+        self.assertTrue(result["settings_preserved"])
+        self.assertFalse(result["display_passed"])
+        self.assertTrue(self.call("status-probe")["complete"])
+
+    def test_default_upgrade_still_requires_the_trusted_project_guard(self):
+        self.request.pop("display_required")
+        context = json.loads(self.context.read_text())
+        context["hook_sources"][0]["trusted"] = False
+        self.context.write_text(json.dumps(context))
+        with self.assertRaisesRegex(ValueError, "observed trusted"):
+            self.call("prepare-probe", self.request)
+        self.assertFalse(self.record.exists())
+
+    def test_legacy_prepared_packet_remains_valid_without_rewriting_it(self):
+        self.request["display_required"] = False
+        self.call("prepare-probe", self.request)
+        record = json.loads(self.record.read_text())
+        old = "Coordinator verifies native evidence and display."
+        current = record["report_skeleton"]["next_action"]
+        record["report_skeleton"]["next_action"] = old
+        record["native_arguments"]["message"] = record["native_arguments"]["message"].replace(current, old)
+        self.record.write_text(json.dumps(record))
+        begun = self.call("begin-probe")
+        self.assertEqual(begun["native_arguments"], record["native_arguments"])
+        self.assertTrue(self.call("record-probe", self.completed())["complete"])
+
+    def test_legacy_selected_packet_and_cached_receipt_remain_compatible(self):
+        self.select_worker()
+        self.call("prepare-probe", self.request)
+        record = json.loads(self.record.read_text())
+        old = "Coordinator verifies native evidence and display."
+        current = record["report_skeleton"]["next_action"]
+        record["report_skeleton"]["next_action"] = old
+        record["native_arguments"]["message"] = record["native_arguments"]["message"].replace(current, old)
+        self.record.write_text(json.dumps(record))
+        self.assertEqual(self.call("begin-probe")["native_arguments"], record["native_arguments"])
+        self.assertTrue(self.call("record-probe", self.completed_selected())["complete"])
+        original = self.record.read_bytes()
+        self.append(self.child, "event_msg", {"type": "task_complete"})
+        self.assertTrue(self.call("status-probe")["selection_verified"])
+        self.assertEqual(self.record.read_bytes(), original)
+        self.append(self.child, "turn_context", {**self.settings, "turn_id": str(uuid4()),
+                                                "model": "selected-model", "effort": "medium"})
+        with self.assertRaisesRegex(ValueError, "Worker settings changed"):
+            self.call("status-probe")
 
     def test_public_cli_prepares_a_packet_and_rejects_unknown_request_fields(self):
         command = [sys.executable, "-B", str(PACKAGE / "workflow.py"), "prepare-probe", str(self.root)]

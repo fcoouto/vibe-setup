@@ -150,7 +150,8 @@ class DelegationPolicyTests(unittest.TestCase):
                            lambda q: q.update(state="not_assessed", pilot=[], canary=[]))
         self.assertEqual(self.call()["decision"]["route"], "inherited")
         self.request["mode"] = "evaluation"
-        self.request["manifest"] = self.save("evaluation", {"mode": "evaluation", "candidate_ids": ["native"],
+        self.request["manifest"] = self.save("evaluation", {"mode": "evaluation", "candidate_bindings": {
+            "native": json.loads(Path(self.request["candidates"][0]["qualification_ref"]).read_text())["binding"]},
             "authorization_ref": self.receipt, "expires_at": self.future, "max_calls": 1, "used_calls": 0,
             "scope": json.loads(Path(self.request["candidates"][0]["qualification_ref"]).read_text())["scope"],
             "case_refs": [self.receipt], "rubric_ref": self.receipt, "stop_conditions": ["Stop after one call"],
@@ -211,7 +212,8 @@ class DelegationPolicyTests(unittest.TestCase):
 
     def test_evaluation_counts_both_arms_as_investment_not_production_savings(self):
         self.request["mode"] = "evaluation"
-        self.request["manifest"] = self.save("evaluation", {"mode": "evaluation", "candidate_ids": ["local"],
+        self.request["manifest"] = self.save("evaluation", {"mode": "evaluation", "candidate_bindings": {
+            "local": json.loads(Path(self.request["candidates"][1]["qualification_ref"]).read_text())["binding"]},
             "authorization_ref": self.receipt, "expires_at": self.future, "max_calls": 1, "used_calls": 0,
             "scope": json.loads(Path(self.request["candidates"][1]["qualification_ref"]).read_text())["scope"],
             "case_refs": [self.receipt], "rubric_ref": self.receipt, "stop_conditions": ["Stop after one call"],
@@ -288,7 +290,8 @@ class DelegationPolicyTests(unittest.TestCase):
         candidate = self.request["candidates"][0]
         self.edit_evidence(candidate["qualification_ref"], lambda q: q.update(state="pilot_only", canary=[]))
         self.request["mode"] = "canary"
-        self.request["manifest"] = self.save("canary", {"mode": "canary", "candidate_ids": ["native"],
+        self.request["manifest"] = self.save("canary", {"mode": "canary", "candidate_bindings": {
+            "native": json.loads(Path(candidate["qualification_ref"]).read_text())["binding"]},
             "authorization_ref": self.receipt, "expires_at": self.future, "max_calls": 10, "used_calls": 0,
             "scope": json.loads(Path(candidate["qualification_ref"]).read_text())["scope"],
             "case_refs": [self.receipt], "rubric_ref": self.receipt, "stop_conditions": ["Stop on failure"], "disposable": True})
@@ -354,7 +357,8 @@ class DelegationPolicyTests(unittest.TestCase):
         self.request["candidates"] = self.request["candidates"][1:]
         local = self.request["candidates"][0]
         self.edit_evidence(local["qualification_ref"], lambda q: q.update(state="suspended"))
-        self.request["manifest"] = self.save("reassessment", {"mode": "evaluation", "candidate_ids": ["local"],
+        self.request["manifest"] = self.save("reassessment", {"mode": "evaluation", "candidate_bindings": {
+            "local": json.loads(Path(local["qualification_ref"]).read_text())["binding"]},
             "authorization_ref": self.receipt, "expires_at": self.future, "max_calls": 1, "used_calls": 0,
             "scope": json.loads(Path(local["qualification_ref"]).read_text())["scope"], "case_refs": [self.receipt],
             "rubric_ref": self.receipt, "stop_conditions": ["Stop after one call"], "disposable": True})
@@ -387,6 +391,62 @@ class DelegationPolicyTests(unittest.TestCase):
         self.request["task"]["role"] = "InventedRole"
         with self.assertRaisesRegex(ValueError, "role"):
             self.call()
+
+    def test_evaluation_and_canary_manifest_reject_model_or_effort_substitution(self):
+        self.request["candidates"] = self.request["candidates"][:1]
+        candidate = self.request["candidates"][0]
+        self.edit_evidence(candidate["qualification_ref"], lambda q: q.update(state="pilot_only", canary=[]))
+        original = copy.deepcopy(candidate)
+        qualification = json.loads(Path(candidate["qualification_ref"]).read_text())
+        for mode in ("evaluation", "canary"):
+            with self.subTest(mode=mode):
+                self.request["mode"] = mode
+                self.request["manifest"] = self.save("fixed-manifest", {"mode": mode, "candidate_bindings": {"native": qualification["binding"]},
+                    "authorization_ref": self.receipt, "expires_at": self.future, "max_calls": 1, "used_calls": 0,
+                    "scope": qualification["scope"], "case_refs": [self.receipt], "rubric_ref": self.receipt,
+                    "stop_conditions": ["Stop after one call"], "disposable": True})
+                self.assertEqual(self.call()["decision"]["route"], "native")
+                for field, replacement in (("model", "other-model"), ("effort", "low")):
+                    with self.subTest(mode=mode, field=field):
+                        candidate[field] = replacement
+                        self.edit_evidence(candidate["qualification_ref"], lambda q: q["binding"].update({field: replacement}))
+                        self.request["client"]["pairs"] = [{"model": candidate["model"], "effort": candidate["effort"]}]
+                        self.assertEqual(self.call()["decision"]["route"], "inherited")
+                        candidate.update(original)
+                        Path(candidate["qualification_ref"]).write_text(json.dumps(qualification))
+                        self.request["client"]["pairs"] = [{"model": "small", "effort": "medium"}]
+
+    def test_local_manifest_freezes_runtime_and_route_identity(self):
+        self.request["candidates"] = self.request["candidates"][1:]
+        candidate = self.request["candidates"][0]
+        self.edit_evidence(candidate["qualification_ref"], lambda q: q.update(state="pilot_only", canary=[]))
+        self.edit_evidence(candidate["local_status_ref"], lambda s: s.update(evaluation_path=True))
+        original = copy.deepcopy(candidate)
+        qualification = json.loads(Path(candidate["qualification_ref"]).read_text())
+        status = json.loads(Path(candidate["local_status_ref"]).read_text())
+        for mode in ("evaluation", "canary"):
+            self.request["mode"] = mode
+            self.request["manifest"] = self.save("local-manifest", {"mode": mode,
+                "candidate_bindings": {"local": qualification["binding"]}, "authorization_ref": self.receipt,
+                "expires_at": self.future, "max_calls": 1, "used_calls": 0, "scope": qualification["scope"],
+                "case_refs": [self.receipt], "rubric_ref": self.receipt, "stop_conditions": ["Stop after one call"], "disposable": True})
+            self.assertEqual(self.call()["decision"]["route"], "local")
+            for field, replacement in (("runtime_digest", "b" * 64), ("version", "v2"),
+                                       ("provider", "another-local-runtime"), ("route", "native")):
+                with self.subTest(mode=mode, field=field):
+                    changed = copy.deepcopy(qualification)
+                    changed["binding"][field] = replacement
+                    if field == "runtime_digest":
+                        self.edit_evidence(candidate["local_status_ref"], lambda s: s.update(runtime_digest=replacement))
+                    else:
+                        candidate[field] = replacement
+                    if field == "route":
+                        changed["binding"].pop("runtime_digest")
+                    Path(candidate["qualification_ref"]).write_text(json.dumps(changed))
+                    self.assertEqual(self.call()["decision"]["route"], "inherited")
+                    candidate.update(original)
+                    Path(candidate["qualification_ref"]).write_text(json.dumps(qualification))
+                    Path(candidate["local_status_ref"]).write_text(json.dumps(status))
 
 
 if __name__ == "__main__":

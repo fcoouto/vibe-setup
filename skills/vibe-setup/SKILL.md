@@ -41,10 +41,16 @@ whole skill outside discovery before replacing owned files. No-change updates
 reuse evidence only while its source/client bindings remain current.
 
 Qualify one canary in each requested client before expanding a rollout. Use
-[native qualification](qualification.md): `prepare-probe`, arm any required badge
-observer, persist `begin-probe`, then pass its exact `native_arguments` to the
-native tool once. Reconcile real logs with `record-probe`. A denial consumes the
-attempt. Keep first-report validity, recovery and display separate. Record every
+[native qualification](qualification.md): verify the trusted project hooks and
+role/specialty declaration, run `prepare-probe`, persist `begin-probe`, then pass
+its exact `native_arguments` to the native tool once. Reconcile real logs with
+`record-probe`. A denial consumes the attempt. Keep dispatch, first-report validity,
+settings preservation and recovery separate. Default upgrades validate the native
+producer contract; they need no external dashboard, observer or display outcome.
+Keep upgrade narration and completion reports about hooks and subagent dispatch.
+Only when the user explicitly requests a named external consumer test, load the
+[optional consumer guide](native-display.md) and add that separate scoped outcome.
+Do not suggest or introduce consumer products during an ordinary upgrade. Record every
 required outcome through `record-update`; use `status-update` for the single
 completion view. Pending trust, inaccessible remotes, ineffective exclusions and
 queued archival remain named dependencies with next actions, never completion.
@@ -101,8 +107,9 @@ queued archival remain named dependencies with next actions, never completion.
    The main agent is Coordinator. Assign each worker a role from the guide and
    a separate specialty; carry both through local execution and native fallback
    using the installed contract. Roles never select native profiles or change
-   model, effort, provider or permissions. Dashboard delivery requires separate
-   evidence; follow the guide's compatibility limits without modifying Habblaud.
+   model, effort, provider or permissions. Validate the declaration, native child
+   identity and hook metadata contract without claiming downstream display.
+   Consumer-specific delivery is outside the default upgrade scope.
    Install the template's normal-task lifecycle instructions into the project's
    existing guide, resolving the actual installed helper path. Routine tasks use
    those instructions directly; they must not repeat complete Vibe onboarding.
