@@ -63,7 +63,11 @@ python3 -B -m unittest discover -s skills/vibe-setup/tests -v
 ```
 
 The skill and its assets live under `skills/vibe-setup/`. Packaged `.codex` files
-are installation inputs, not root configuration for this source repository.
+remain installation inputs. The separate root `.codex` copy configures this
+repository as a Vibe Setup consumer; read [the contributor guide](AGENTS.md) and
+[its delegation policy](.codex/delegation-brief.md) for development. Local
+`.codex/config.toml` stays ignored; merge the portable example without replacing
+existing model, provider, reasoning or permission preferences.
 Project-specific adoption records belong to each consuming project.
 
 Hooks are workflow guardrails, can fail open, and do not sandbox subagents.
