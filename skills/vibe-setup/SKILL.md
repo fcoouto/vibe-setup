@@ -1,12 +1,13 @@
 ---
 name: vibe-setup
-description: Use when a user asks Codex to adopt, repair, update, or verify the full Vibe Coding Toolkit setup in an existing project, including its agent workflow. Not for routine task startup, isolated code changes, general machine setup, or scaffolding a new application.
+description: Use when a user asks Codex to upgrade the installed Vibe Setup skill or adopt, repair, update, or verify the full Vibe Coding Toolkit setup in an existing project, including its agent workflow. Not for routine task startup, isolated code changes, general machine setup, or scaffolding a new application.
 ---
 
 # Vibe Setup
 
-Complete the applicable Vibe setup in the target project, including validation
-and independent review. This directory is a self-contained skill and portable
+Upgrade the installed skill or complete the applicable Vibe setup in the target
+project, including validation and independent review. This directory is a
+self-contained skill and portable
 subagent package with a small standard-library Python helper. Resolve `workflow.py`
 relative to this installed skill; do not assume a source checkout or fixed user
 path. The component installer still covers only the subagent guard. Use the
@@ -25,6 +26,10 @@ into Vibe or apply newer repository instructions to an older installation implic
 ## Procedure
 
 For an update or reapply, start with the [update transaction](update-contract.md).
+For an installed-skill-only upgrade, use the latest official release from
+`https://github.com/fcoouto/vibe-setup` unless the user selected another source.
+Keep project setup steps out of that operation unless projects were explicitly
+selected. After verified completion, offer the [project handoff](update-contract.md#offer-the-next-project-update).
 Create one private plan covering the released candidate, the existing installed
 copy, explicitly selected/enrolled project roots and requested clients. Identify
 source-only roots separately from consumers and umbrellas. Reuse applicable
