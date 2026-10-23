@@ -80,6 +80,15 @@ identity and ancestry from the selected base. Primary, foreign, detached,
 unregistered, nested and conflicting task worktrees are refused. Existing task
 bindings are checked again on every startup; a stale success record is not proof.
 
+The first successful `start` for a task also performs one pass over **all** pending
+cleanup records in the same Git common directory. App and VS Code use this same
+command through their existing task instructions; no additional native hook,
+model turn, polling or timer is needed. This is lifecycle task startup, not an
+arbitrary chat-open, SessionStart, resume or compaction event. Repeating `start`
+for an already verified task does not repeat the pass. Cleanup outcomes appear
+under `pending_cleanup.tasks`; an old task's blocker does not block unrelated
+cleanup or claim that the new task is ready for production.
+
 Before writing, require `status=ok` and `implementation=worktree_verified`.
 Use the returned `context.command_cwd` for commands and
 `context.worker_cwd` in writable worker assignments. Reverify after changing
@@ -329,6 +338,44 @@ A closed-unmerged task can therefore complete remote cleanup while retaining its
 worktree. A receipt with both resources removed remains historical evidence.
 Unexpected external disappearance without recorded removal intent stays pending.
 Recreated branches and changed inventories are never silently deleted again.
+
+### Deferred cleanup at the next task
+
+After terminal-state, ownership, stopped-writer, clean-tree, head and policy checks
+pass, cleanup records `cleanup.deferred = {"kind": "git"|"managed", "state": "ready"}`
+before attempting the enabled removals. This is a retirement handoff: the task
+relinquishes its exclusive worktree until explicitly reused. It is not a cached
+claim that writers are currently idle. Do not restart writers in a retired
+checkout without running `start` again. Starting that task, using its worktree as
+the new task's source, or synchronizing it cancels the handoff before further
+work. A new explicit cleanup with fresh ownership and stopped writers can renew
+it. A supplied running/unknown writer or shared/pinned scope also cancels it.
+Revocation applies even when earlier opt-outs completed cleanup while retaining
+the worktree. If the caller's handoff cannot be read or durably cancelled, startup
+blocks before authorizing writers; only unrelated cleanup failures are isolated.
+
+Each new task visits every pending record once, with no one-worktree limit or
+fixed candidate cap. The existing nonblocking lifecycle lock serializes startup
+with cleanup and publication. Contention requires a later normal retry; the
+helper never waits in a loop. Every eligible handoff reruns the ordinary cleanup
+checks, including current opt-outs, terminal PR inventory, exact retained heads,
+remote absence, clean files and locks. The caller's task, source and current
+directory are excluded. One malformed record or failed cleanup leaves a concrete
+pending outcome and does not stop later candidates. A pass is finite, but duration
+depends on the number of pending tasks and bounded Git/GitHub commands.
+
+The pass reads no old build/review logs, runs no security review and dispatches
+no model. Historical pending records without a retirement handoff cannot authorize
+Git removal: run `cleanup` with fresh usage to establish it. Existing native
+`archive_requested` records can be reconciled only after the owner has removed
+both the directory and Git registration.
+
+Managed ownership survives later callers and cannot be relabeled as Git. A new
+App or VS Code task cannot archive another chat's App-managed worktree through
+the current archive interface. Such folders remain pending for their native
+owner; no private IPC or Git-removal fallback is used. The next startup can
+verify a completed native archive. Installation and common-command tests do not
+prove native event delivery, and this design does not depend on such events.
 
 Local/ref checks reduce races but cannot prevent unrelated processes from writing.
 GitHub metadata has no compare-and-swap guarantee. Preserve ambiguous outcomes,

@@ -258,6 +258,8 @@ def manual_start(source: Path, request: dict, base_commit: str) -> dict:
 def start_task(source: Path, request: dict) -> dict:
     try:
         return _start_task(source, request)
+    except RemoteFailure as error:
+        return result("start", "action_required", "not_started", next_action=str(error))
     except (ValueError, OSError) as error:
         message = str(error) if isinstance(error, ValueError) else "Filesystem operation failed; preserve progress and inspect permissions/paths"
         return result("start", "blocked", "not_started", next_action=message)
@@ -322,7 +324,7 @@ def _start_task(source: Path, request: dict) -> dict:
     tasks.mkdir(parents=True, exist_ok=True, mode=0o700)
     lock_path = state_dir / "start.lock"
     safe_file(lock_path)
-    with lock_path.open("a") as lock:
+    with lifecycle_lock(common), lock_path.open("a") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -354,11 +356,14 @@ def _start_task(source: Path, request: dict) -> dict:
         context = verify_worktree(source, target, branch)
         if git(target, "merge-base", "--is-ancestor", base_commit, "HEAD", check=False).returncode:
             raise ValueError("Task base changed during startup; reconcile before editing")
-        if record["state"] != "verified":
+        newly_verified = record["state"] != "verified"
+        if newly_verified:
             record["state"] = "verified"
             write_record(record_path, record)
             changes.append("task_bound")
+        pending_cleanup = startup_cleanup(record, newly_verified)
         return result("start", "ok", "worktree_verified", changes=changes, context=context,
+                      pending_cleanup=pending_cleanup,
                       evidence_ref=str(record_path), next_action="Use command_cwd and worker_cwd for every task write; reverify after context changes")
 
 
@@ -1130,6 +1135,7 @@ def sync_event(request: dict, task: dict) -> dict:
                 "last_ready": False, "cleanup": {}}
             if state["binding"] != binding or state["publication"] != request["publication"] or state["schedule"] != request["schedule"]:
                 raise ValueError("Task publication binding or schedule changed; reconcile existing state")
+            cancel_cleanup_handoff(state)
             event = state["events"].get(request["event_id"])
             if event and {key: value for key, value in event["request"].items() if key != "usage"} != {
                     key: value for key, value in request.items() if key != "usage"}:
@@ -1549,13 +1555,98 @@ def terminal_prs(state: dict) -> list[dict]:
     return prs
 
 
+def cleanup_handoff(state: dict) -> dict | None:
+    handoff = state["cleanup"].get("deferred")
+    if handoff is not None and (
+            not isinstance(handoff, dict) or set(handoff) != {"kind", "state"}
+            or handoff["kind"] not in ("git", "managed") or handoff["state"] not in ("ready", "cancelled")):
+        raise ValueError("Reconcile malformed deferred cleanup ownership")
+    return handoff
+
+
+def cancel_cleanup_handoff(state: dict) -> None:
+    cleanup = state["cleanup"]
+    handoff = cleanup_handoff(state)
+    if ((handoff and handoff["state"] == "ready")
+            or (not handoff and cleanup.get("local") == "archive_requested")):
+        cleanup["deferred"] = {"kind": handoff["kind"] if handoff else "managed", "state": "cancelled"}
+        cleanup["last_error"] = "Task reused; run cleanup with fresh ownership and stopped writers before deferring again"
+        save_lifecycle(state)
+
+
+def startup_cleanup(current: dict, newly_verified: bool) -> dict:
+    """One pass under lifecycle_lock; a handoff relinquishes ownership until reuse."""
+    common = Path(current["common_dir"])
+    outcomes = []
+    response = {"status": "checked" if newly_verified else "not_run", "tasks": outcomes}
+    directory = canonical(common / "vibe-setup/lifecycle")
+    callers = [Path(current["source"]), Path(current["worktree"]), Path.cwd().resolve()]
+    enabled = load_cleanup_policy(Path(current["source"])) and load_cleanup_policy(Path(current["worktree"]))
+    for path in sorted(directory.glob("*.json")):
+        caller = path.stem == current["task_id"]
+        try:
+            binding = read_record(common / "vibe-setup/tasks" / path.name)
+            root = canonical(Path(binding["worktree"]))
+            caller = caller or any(p.is_relative_to(root) for p in callers)
+            state = read_lifecycle(path)
+            if (binding != state["binding"] or binding["common_dir"] != str(common)
+                    or binding["state"] != "verified" or lifecycle_path(binding) != path):
+                raise ValueError("Pending cleanup binding changed; reconcile ownership")
+            source = canonical(Path(binding["source"]))
+            if repository(source)["common_dir"] != str(common):
+                raise ValueError("Pending cleanup source belongs to another repository")
+            cleanup = state["cleanup"]
+            if caller:
+                cancel_cleanup_handoff(state)
+                continue
+            if not newly_verified or cleanup.get("state") != "pending":
+                continue
+            handoff = cleanup_handoff(state)
+            legacy_archive = handoff is None and cleanup.get("local") == "archive_requested"
+            if not enabled:
+                reason = "Startup cleanup opted out; resources retained"
+            elif not legacy_archive and (not handoff or handoff["state"] != "ready"):
+                reason = "No active retirement handoff; run cleanup with fresh ownership and stopped writers"
+            elif (legacy_archive or handoff["kind"] == "managed") and (
+                    root.exists() or any(entry.get("worktree") == str(root) for entry in worktrees(source))):
+                reason = "Native owner must archive this managed worktree; startup cannot remove it"
+            else:
+                # This is a relinquished ownership contract, not a cached live usage report.
+                usage = {"kind": "managed" if legacy_archive else handoff["kind"], "scope": "exclusive", "writers": []}
+                outcome = _cleanup_worktree(state, usage)
+                outcomes.append({"task_id": binding["task_id"], "cleanup": outcome["cleanup"],
+                                 "next_action": outcome.get("next_action")})
+                continue
+            if cleanup.get("last_error") != reason:
+                cleanup["last_error"] = reason
+                save_lifecycle(state)
+            outcomes.append({"task_id": binding["task_id"], "cleanup": "pending", "next_action": reason})
+        except (ValueError, OSError, RemoteFailure, KeyError, TypeError, AttributeError, IndexError) as error:
+            if caller:
+                raise ValueError("Cannot durably cancel this task's cleanup handoff; reconcile before resuming writers") from error
+            # Bad historical records must neither redirect cleanup nor stop later candidates.
+            message = str(error) if isinstance(error, (ValueError, RemoteFailure)) else "Reconcile unusable pending cleanup record"
+            outcomes.append({"task_id": path.stem, "cleanup": "pending", "next_action": message})
+    return response
+
+
 def _cleanup_worktree(state: dict, usage: dict) -> dict:
     binding, publication = state["binding"], state["publication"]
     root, source = canonical(Path(binding["worktree"])), canonical(Path(binding["source"]))
     path, cleanup = lifecycle_path(binding), state["cleanup"]
     delivery = "not_checked"
     try:
-        validate_usage(usage)
+        try:
+            validate_usage(usage)
+            if usage["scope"] != "exclusive":
+                raise ValueError("Preserve shared/pinned worktrees")
+        except ValueError:
+            cancel_cleanup_handoff(state)
+            raise
+        handoff = cleanup_handoff(state)
+        owner = handoff["kind"] if handoff else "managed" if cleanup.get("local") == "archive_requested" else None
+        if owner is not None and usage["kind"] != owner:
+            raise ValueError("Recorded cleanup owner changed; never bypass native ownership")
         if not load_policy(source) or (root.exists() and not load_policy(root)):
             return result("cleanup", "ok", "disabled", cleanup="disabled", delivery="disabled", evidence_ref=str(path))
         options = cleanup_options(state)
@@ -1623,6 +1714,8 @@ def _cleanup_worktree(state: dict, usage: dict) -> dict:
         if "prs" in cleanup and cleanup["prs"] != numbers:
             raise ValueError("Cleanup PR inventory changed after intent; reconcile before deletion")
         cleanup.update(state="pending", heads=heads, prs=numbers, delivery=delivery)
+        if remove_local:
+            cleanup["deferred"] = {"kind": usage["kind"], "state": "ready"}
         cleanup.setdefault("deleted", [])
         cleanup.setdefault("local", "pending")
         cleanup.pop("last_error", None)

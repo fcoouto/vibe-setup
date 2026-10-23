@@ -51,6 +51,13 @@ independent default-ON remote-branch and worktree options. Onboarding adds direc
 helper instructions to the existing project guide for normal tasks. The component
 installer API/CLI still installs only the subagent guard.
 
+Each newly verified task startup processes all eligible pending cleanup records
+for that repository through the same helper in App and VS Code. It uses durable
+retirement handoffs and rechecks deletion safety, without polling or model runs.
+Unsupported App-managed removals remain pending for their native owner. See
+[deferred cleanup](task-lifecycle.md#deferred-cleanup-at-the-next-task) for reuse,
+opt-out and legacy-record behavior.
+
 Source baseline: [Vibe Prompt 12 at `790a895`](https://github.com/soumatheusgomes/vibe-coding-toolkit/blob/790a895304e0c08b70a5b215c9d334f1c86b816c/docs/prompts/12-existing-project-setup.md).
 Use that complete prompt for the surrounding setup, not only this subagent package.
 On an update, resolve upstream once and record its immutable revision. Compare
