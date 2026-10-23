@@ -166,6 +166,10 @@ queued archival remain named dependencies with next actions, never completion.
    before further implementation, pausing that PR if withdrawal cannot be observed
    or explicitly confirmed. Distinguish implementation, delivery and cleanup;
    attribute human confirmations and never infer remote facts from local records.
+   For required companion PRs across repositories, use the lifecycle contract’s
+   `check-completion` with every required existing task before claiming overall
+   completion; pending or blocked companions remain incomplete. This observation
+   does not change individual readiness or cleanup.
    Missing automation gets concrete manual lookup/push/PR steps and same-event
    recovery, not a new account, duplicate PR or silent completion. Never auto-merge.
 8. **Close superseded work and clean up terminal tasks.** Apply `[SUPERSEDED]`

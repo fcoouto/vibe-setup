@@ -191,6 +191,56 @@ local work available without claiming synchronized delivery. A no-diff task
 creates neither an empty commit nor a PR. Attach a published PR to the native
 chat when that capability is available.
 
+## Cross-repository completion
+
+Before claiming overall completion for work with required companion PRs, run
+`check-completion` with every required existing Vibe task. Keep this explicit
+manifest in the existing private task plan or evidence directory; no group registry
+or new lifecycle records are created. The root argument supplies command context;
+it does not implicitly add that repository or discover siblings.
+
+```sh
+python3 -B /path/to/vibe-setup/workflow.py check-completion /absolute/source < companions.json
+```
+
+```json
+{
+  "members": [
+    {"source": "/absolute/backend", "task_id": "0652f3d5-16e3-4a59-a1b3-f398149914f3"},
+    {"source": "/absolute/documentation", "task_id": "d7bd47d4-dcbf-4cbe-bcbf-cab1f3f5db34"}
+  ]
+}
+```
+
+Supply 1–32 unique members using canonical repository roots and task UUIDs.
+Each member reuses its verified task binding and publication record. Fresh GitHub
+reads use the existing host, transport and actor checks. The command validates
+recorded PR identities, heads, target branches and task markers; existing task
+worktrees must still match the published head and have no unpublished changes.
+Removed worktrees remain inspectable through the source repository's retained
+records. Any retained task branch must still match the published head. A moved or
+missing-but-registered worktree blocks completion until its binding is reconciled.
+Changing records during inspection blocks the observation.
+
+The output contains per-member `completion` and `reason`, plus overall
+`completion`: `complete` only when every listed task's associated PRs are observed
+merged; `pending` for unpublished tasks or open PRs; `blocked` for closed-unmerged
+PRs, missing/inconsistent state or unavailable remote facts. Blocked takes
+precedence over pending. Exit codes are 0, 2 and 3 respectively. A task with no
+publication does not count as complete, including no-diff tasks; include only
+companions that require PR delivery. Invalid manifests are rejected before remote
+reads. Reconcile missing records or publication changes through existing per-task
+operations, then rerun with the same complete member list.
+
+This is a read-only observation, not an atomic cross-repository transaction or
+continuous monitor. The coordinator owns manifest completeness and must rerun
+before a later completion claim. It does not publish, merge, update PR metadata,
+schedule work, change per-repository READY gates or trigger cleanup. Per-task
+startup, synchronization, recovery, supersession and cleanup remain unchanged.
+A closed or superseded PR is not a merged deliverable; explicitly reconcile the
+required task list if accepted scope changes. Installation alone does not ensure
+that every client invokes this check.
+
 ## Resume publication or manual actions
 
 Resume from an existing checkout, preferably the source outside the task worktree:
