@@ -3,10 +3,23 @@ import copy
 import contextlib
 import io
 import json
+import hashlib
+from pathlib import Path
 from unittest.mock import patch
 
 from test_workflow_lifecycle import PublicationFixture
 from test_workflow_setup import WorkflowFixture
+
+
+def coverage_proof(snapshot, proof, files=("app.txt",)):
+    path = Path(proof["path"]).with_name("coverage.json")
+    record = {"schema_version": 1, "snapshot": snapshot, "files": list(files),
+              "areas": {name: {"status": "covered", "summary": "Fixture boundary inspected.",
+                                "evidence": [proof]}
+                        for name in ("scope", "methods", "history", "callers", "tests", "adversarial", "execution")}}
+    path.write_text(json.dumps(record))
+    return {"name": "security-coverage", "outcome": "passed", "path": str(path),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
 def security_record(snapshot, proof, risk="R0"):
@@ -15,9 +28,13 @@ def security_record(snapshot, proof, risk="R0"):
         names.append("security-validation")
     if risk == "R2":
         names.append("independent-security-review")
-    return {"snapshot": snapshot, "risk": risk, "rationale": "Private scope and risk assessment.",
+    record = {"snapshot": snapshot, "risk": risk, "rationale": "Private scope and risk assessment.",
             "status": "complete", "required_checks": names,
             "checks": [{**proof, "name": name} for name in names]}
+    if risk in ("R1", "R2"):
+        record["required_checks"].append("security-coverage")
+        record["checks"].append(coverage_proof(snapshot, proof))
+    return record
 
 
 class SecurityPublicationTests(PublicationFixture):
@@ -26,6 +43,78 @@ class SecurityPublicationTests(PublicationFixture):
         event["validation"]["security"] = security_record(
             event["snapshot"], event["validation"]["review"], risk)
         return event
+
+    def rewrite_coverage(self, event, change):
+        entry = next(c for c in event["validation"]["security"]["checks"] if c["name"] == "security-coverage")
+        path = Path(entry["path"])
+        record = json.loads(path.read_text())
+        change(record)
+        path.write_text(json.dumps(record))
+        entry["sha256"] = self.workflow.fingerprint(path)["sha256"]
+
+    def test_ready_rejects_assertion_only_security_coverage(self):
+        event = self.secure_event("R2")
+        security = event["validation"]["security"]
+        security["required_checks"].remove("security-coverage")
+        security["checks"] = [c for c in security["checks"] if c["name"] != "security-coverage"]
+        self.assertEqual(self.sync(event)["status"], "blocked")
+        self.assertEqual(self.calls, [])
+
+    def test_coverage_requires_every_area_current_scope_and_concrete_evidence(self):
+        changes = [
+            lambda r: r.update(snapshot="0" * 64),
+            lambda r: r.update(files=["another.py"]),
+            lambda r: r.update(schema_version=True),
+            lambda r: r.update(files=["app.txt", "app.txt"]),
+            lambda r: r["areas"].pop("history"),
+            lambda r: r["areas"]["callers"].update(status="not_run"),
+            lambda r: r["areas"]["history"].update(summary=" "),
+            lambda r: r["areas"]["history"].update(evidence=[]),
+            lambda r: r["areas"]["tests"].update(status="not_applicable"),
+            lambda r: r["areas"]["methods"].update(evidence=[{"claim": "passed"}]),
+            lambda r: r["areas"]["tests"]["evidence"][0].update(outcome="not_run"),
+        ]
+        for change in changes:
+            with self.subTest(change=changes.index(change)):
+                event = self.secure_event("R2")
+                self.rewrite_coverage(event, change)
+                self.assertEqual(self.sync(event)["status"], "blocked")
+        self.assertEqual(self.calls, [])
+
+    def test_coverage_exclusions_need_inspected_scope_and_malformed_json_blocks(self):
+        event = self.secure_event("R2")
+        self.rewrite_coverage(event, lambda r: r["areas"]["history"].update(
+            status="not_applicable", summary="New entrypoint; baseline has no prior implementation."))
+        self.workflow.validate_event(event)
+        entry = event["validation"]["security"]["checks"][-1]
+        path = Path(entry["path"])
+        valid = path.read_bytes()
+        malformed = [b"not JSON", b"[" * 2000, valid + b" " * 65536,
+                     valid.replace(b'"schema_version": 1', b'"schema_version": 1, "schema_version": 1')]
+        for payload in malformed:
+            with self.subTest(payload=payload[:20]):
+                path.write_bytes(payload)
+                entry["sha256"] = self.workflow.fingerprint(path)["sha256"]
+                self.assertEqual(self.sync(event)["status"], "blocked")
+        self.assertEqual(self.calls, [])
+
+    def test_nested_coverage_evidence_is_rechecked_during_ready(self):
+        event = self.secure_event("R2")
+        nested = self.home / "history.log"
+        nested.write_text("Baseline protection traced to its introducing commit.")
+        proof = {"name": "history", "outcome": "passed", "path": str(nested),
+                 "sha256": self.workflow.fingerprint(nested)["sha256"]}
+        self.rewrite_coverage(event, lambda r: r["areas"]["history"].update(evidence=[proof]))
+        original = self.api
+        def mutate(publication, endpoint, method="GET", payload=None, paginate=False):
+            result = original(publication, endpoint, method, payload, paginate)
+            if endpoint == "graphql" and "markPullRequestReadyForReview" not in payload.get("query", ""):
+                nested.write_text("History evidence changed after initial acceptance")
+            return result
+        with patch.object(self.workflow, "gh_api", side_effect=mutate):
+            response = self.sync(event)
+        self.assertEqual(response["status"], "blocked", response)
+        self.assertTrue(self.prs[0]["title"].startswith("[BLOCKED]"))
 
     def test_legacy_ready_without_security_blocks_before_publication(self):
         event = self.event()
@@ -229,6 +318,16 @@ class SecurityReleaseTests(WorkflowFixture):
         proof = {"name": "impact-review", "outcome": "passed", "path": str(proof_path),
                  "sha256": self.workflow.fingerprint(proof_path)["sha256"]}
         return {"files": ["app.txt"], "snapshot": snapshot, "security": security_record(snapshot, proof)}
+
+    def test_release_rejects_unsubstantiated_behavior_coverage(self):
+        request = self.request_security()
+        proof = request["security"]["checks"][0]
+        request["security"] = security_record(request["snapshot"], proof, "R1")
+        self.assertEqual(self.cli("check-security", request)[0], 0)
+        record = Path(request["security"]["checks"][-1]["path"])
+        record.write_text("All checks passed")
+        request["security"]["checks"][-1]["sha256"] = self.workflow.fingerprint(record)["sha256"]
+        self.assertEqual(self.cli("check-security", request)[0], 3)
 
     def test_release_gate_works_without_task_even_when_lifecycle_disabled(self):
         self.policy('[task_lifecycle]\nenabled = false\nauto_cleanup = false\n')

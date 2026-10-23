@@ -16,6 +16,12 @@ blocks READY and release preflight when required evidence is missing, stale,
 incomplete or failing. Separate deployment pipelines must invoke that preflight;
 installing the skill does not intercept arbitrary release commands.
 
+Behavior and sensitive changes also require a snapshot-bound coverage record:
+method mapping, historical regression analysis, named/countable callers,
+adversarial cases, test results and execution limits. The helper validates the
+record and nested evidence fingerprints; independent review verifies substance.
+Historical gaps receive new dated evidence without rewriting prior receipts.
+
 ## Delegation and model policy
 
 Start with the [delegation policy](skills/vibe-setup/delegation-brief.md):

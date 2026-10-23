@@ -90,6 +90,12 @@ it explicitly. Installation, execution and semantic coverage are separate eviden
 Review upstream changes before adoption, reuse valid evidence, and rerun only
 affected checks; draft worktrees do not automatically trigger audits.
 
+Behavior and sensitive changes also require a snapshot-bound coverage record:
+method mapping, historical regression analysis, named/countable callers,
+adversarial cases, test results and execution limits. The helper verifies the
+record and nested evidence fingerprints; independent review verifies substance.
+Historical gaps receive new dated evidence without rewriting prior receipts.
+
 ## Difficulty-based worker selection
 
 Read [the selection policy](delegation-brief.md#difficulty-based-worker-selection).

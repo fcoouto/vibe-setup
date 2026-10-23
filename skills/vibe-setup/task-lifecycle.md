@@ -12,7 +12,9 @@ at three gates: implementation-complete/READY/production candidate, release/depl
 or an explicit user/project requirement. At each gate, classify impact, check
 Trail of Bits updates, review applicable updates before adoption, and reuse valid
 private evidence. READY and release require complete passing validation, including
-`trailofbits-update-review`. Draft edits and worktree creation do not trigger audits.
+`trailofbits-update-review` and, for R1/R2, the snapshot-bound `security-coverage`
+record with current nested evidence. Legacy R1/R2 receipts need a fresh assessment
+before new readiness/release; withdrawal and cleanup remain available. Draft edits and worktree creation do not trigger audits.
 
 For a package update across the installed skill and selected consumers, use the
 [update transaction contract](update-contract.md). It adds private scope, recovery
