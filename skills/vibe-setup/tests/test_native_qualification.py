@@ -131,6 +131,28 @@ class NativeQualificationTests(unittest.TestCase):
         self.assertEqual(set(result["report_skeleton"]), set(self.report))
         self.assertEqual(result["specialty_assessment"], "Not assessed")
 
+    def test_current_desktop_originator_qualifies_without_settings_overrides(self):
+        rows = [json.loads(line) for line in self.parent.read_text().splitlines()]
+        rows[0]["payload"]["originator"] = "Codex Desktop"
+        self.parent.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+        result = self.prepare_begin()
+        self.assertEqual(set(result["native_arguments"]), {"task_name", "message", "fork_turns"})
+        self.assertEqual(json.loads(self.record.read_text())["settings"]["model"], self.settings["model"])
+
+    def test_originator_alias_does_not_accept_cli_unknown_or_wrong_client(self):
+        original = [json.loads(line) for line in self.parent.read_text().splitlines()]
+        context = json.loads(self.context.read_text())
+        for client, originator in (("app", "codex_cli_rs"), ("app", "Codex Desktop unknown"),
+                                   ("app", "codex_vscode"), ("vscode", "Codex Desktop")):
+            with self.subTest(client=client, originator=originator):
+                rows = copy.deepcopy(original)
+                rows[0]["payload"]["originator"] = originator
+                self.parent.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+                self.context.write_text(json.dumps({**context, "client": client}))
+                with self.assertRaisesRegex(ValueError, "originator"):
+                    self.call("prepare-probe", self.request)
+                self.assertFalse(self.record.exists())
+
     def test_selected_packet_uses_authorized_pair_and_fresh_context(self):
         self.select_worker()
         args = self.prepare_begin()["native_arguments"]
@@ -138,6 +160,26 @@ class NativeQualificationTests(unittest.TestCase):
         self.assertEqual(args["reasoning_effort"], "low")
         self.assertEqual(args["fork_turns"], "none")
         self.assertNotIn("preserve inherited model", args["message"])
+
+    def test_json_wrapped_result_reads_require_the_matching_native_call(self):
+        self.request["display_required"] = False
+        self.prepare_begin()
+        request = self.completed()
+        original = [json.loads(line) for line in self.child.read_text().splitlines()]
+        for matching in (True, False):
+            with self.subTest(matching=matching):
+                rows = copy.deepcopy(original)
+                for row in rows:
+                    item = row["payload"]
+                    if item.get("type") == "function_call_output" and item.get("call_id") == "README.md":
+                        item["type"] = "custom_tool_call_output"
+                        item["call_id"] = "README.md" if matching else "unrelated"
+                        item["output"] = [{"type": "input_text", "text": json.dumps({
+                            "check": 1, "result": "# Example\nRead this line.\n"})}]
+                self.child.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+                result = self.call("record-probe", request)
+                self.assertEqual(result["read_results"][str(self.readme)], matching)
+                self.assertEqual(result["complete"], matching)
 
     def test_selection_rejects_missing_authorization_unsupported_pairs_and_tool_fields(self):
         self.select_worker()
