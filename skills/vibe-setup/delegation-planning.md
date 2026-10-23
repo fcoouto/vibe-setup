@@ -138,6 +138,16 @@ as `coordinator`. Outcome is `accepted`, `failed`, `denied`, `canceled` or `unce
 Unknown or mismatched worker/Coordinator settings are routing failures. A rescued
 delivery can be accepted overall while `candidate_accepted` remains false.
 
+The result preserves `outcome` and `worker_id`. An `uncertain` outcome returns
+`status: "action_required"` (CLI exit 2), with `delivered: false`, and requires
+reconciling the existing worker and any partial effects before retry or replacement.
+Routing failures take precedence and retain `status: "blocked"` (exit 3), including
+when the outcome is uncertain. Other valid outcomes retain `status: "ok"` (exit 0);
+this validates the report, not successful delivery or permission to retry.
+Keep unresolved outcomes in the durable attempt history supplied to the next
+`plan-delegation` call. The helper does not stop workers or maintain that history;
+`delivered: false` alone never authorizes another attempt.
+
 Measurements require `unit`, boolean `matched`, `match_ref`, `expected_owners`
 and `spans`. Units are `token_proxy`, `actual_currency`, `price_estimate` or
 `runtime_seconds`; keep currency/rate basis consistent in the supporting receipts.

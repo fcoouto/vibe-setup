@@ -185,6 +185,70 @@ class DelegationPolicyTests(unittest.TestCase):
             "coordinator_after": copy.deepcopy(self.request["coordinator"]), "outcome": "accepted", "rescued": False,
             "evidence_ref": self.receipt, "checks_ref": self.receipt}, "measurements": None}
 
+    def test_report_retains_observed_outcome_and_worker_identity(self):
+        for outcome in ("accepted", "failed", "denied", "canceled", "uncertain"):
+            with self.subTest(outcome=outcome):
+                request = self.report_request()
+                request["observation"]["outcome"] = outcome
+                result = self.call("report-delegation", request)
+                self.assertEqual(result.get("outcome"), outcome)
+                self.assertEqual(result.get("worker_id"), "job-1")
+                self.assertEqual(result["status"], "action_required" if outcome == "uncertain" else "ok")
+                self.assertEqual(result["delivered"], outcome == "accepted")
+                self.assertEqual(result["candidate_accepted"], outcome == "accepted")
+
+    def test_uncertain_report_requires_reconciliation_before_replacement(self):
+        request = self.report_request()
+        request["observation"]["outcome"] = "uncertain"
+        result = self.call("report-delegation", request)
+        self.assertEqual(result["status"], "action_required")
+        self.assertEqual(result["routing_failures"], [])
+        self.assertIn("reconcile", result["next_action"].lower())
+        self.assertIn("before", result["next_action"].lower())
+        self.assertIn("replac", result["next_action"].lower())
+        self.assertFalse(result["delivered"])
+        self.assertFalse(result["candidate_accepted"])
+        saved = json.loads(Path(request["plan"]).read_text())
+        self.request["attempts"] = [{"attempt_id": result["worker_id"], "state": result["outcome"],
+                                     "request_hash": saved["decision"]["request_hash"]}]
+        decision = self.call()["decision"]
+        self.assertEqual(decision["route"], "coordinator")
+        self.assertIsNone(decision["candidate_id"])
+        self.assertIn("Reconcile", decision["reason"])
+
+    def test_uncertain_report_never_downgrades_routing_failures(self):
+        for field in ("model", "effort", "provider", "permissions", "coordinator_after"):
+            with self.subTest(field=field):
+                request = self.report_request()
+                request["observation"]["outcome"] = "uncertain"
+                if field == "coordinator_after":
+                    request["observation"][field]["effort"] = "low"
+                else:
+                    request["observation"][field] = "different"
+                result = self.call("report-delegation", request)
+                self.assertEqual(result["status"], "blocked")
+                self.assertTrue(result["routing_failures"])
+                self.assertEqual(result.get("outcome"), "uncertain")
+                self.assertEqual(result.get("worker_id"), "job-1")
+                self.assertIn("reconcile", result["next_action"].lower())
+
+    def test_public_report_cli_returns_action_required_for_uncertainty(self):
+        command = [sys.executable, "-B", str(PACKAGE / "workflow.py"), "report-delegation", str(self.root)]
+        for outcome, mismatch, code, status in (("accepted", False, 0, "ok"),
+                                                ("uncertain", False, 2, "action_required"),
+                                                ("uncertain", True, 3, "blocked")):
+            with self.subTest(outcome=outcome, mismatch=mismatch):
+                request = self.report_request()
+                request["observation"]["outcome"] = outcome
+                if mismatch:
+                    request["observation"]["model"] = "different"
+                process = subprocess.run(command, input=json.dumps(request), text=True, capture_output=True)
+                self.assertEqual(process.returncode, code, process.stdout + process.stderr)
+                result = json.loads(process.stdout)
+                self.assertEqual(result["status"], status)
+                self.assertEqual(result.get("outcome"), outcome)
+                self.assertEqual(result.get("worker_id"), "job-1")
+
     def test_observed_mismatch_and_coordinator_drift_are_routing_failures(self):
         request = self.report_request()
         request["observation"]["model"] = "different"
