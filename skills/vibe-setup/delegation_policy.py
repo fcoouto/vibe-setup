@@ -542,11 +542,15 @@ def report(root, request, wf):
     if observation["permissions"] != chosen["permissions"]:
         failures.append("Worker permissions differ or are unknown")
     accepted = not failures and observation["outcome"] == "accepted" and not observation["rescued"]
-    return wf["result"]("report-delegation", "blocked" if failures else "ok", "observation_only",
+    uncertain = observation["outcome"] == "uncertain"
+    status = "blocked" if failures else "action_required" if uncertain else "ok"
+    return wf["result"]("report-delegation", status, "observation_only",
         task_id=saved["task_id"], mode=saved["mode"], plan_hash=plan_hash, evidence=refs,
+        outcome=observation["outcome"], worker_id=observation["worker_id"],
         candidate_accepted=accepted, delivered=observation["outcome"] == "accepted", rescued=observation["rescued"],
         routing_failures=failures, accounting=accounting(request["measurements"], saved["mode"], not failures and observation["outcome"] == "accepted", wf, refs),
-        next_action="Stop/reconcile the worker and partial effects before replacement" if failures else "Coordinator independently verifies integration; qualification is unchanged",
+        next_action=("Stop/reconcile the worker and partial effects before retrying or replacing it"
+                     if failures or uncertain else "Coordinator independently verifies integration; qualification is unchanged"),
         limits=["External observations are not host attestation", "Complete authoritative whole-task totals take precedence over components from the same source/run; components alone leave usage unknown", "No automatic qualification promotion or repeatable-savings certification"])
 
 
