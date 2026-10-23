@@ -7,6 +7,13 @@ operations and adds direct helper instructions for normal project tasks. The exi
 still installs only the subagent component; it does not install the helper or
 policy asset. Run the helper from the complete reviewed package.
 
+Every task follows [mandatory proportional security validation](security-validation.md)
+at three gates: implementation-complete/READY/production candidate, release/deployment,
+or an explicit user/project requirement. At each gate, classify impact, check
+Trail of Bits updates, review applicable updates before adoption, and reuse valid
+private evidence. READY and release require complete passing validation, including
+`trailofbits-update-review`. Draft edits and worktree creation do not trigger audits.
+
 For a package update across the installed skill and selected consumers, use the
 [update transaction contract](update-contract.md). It adds private scope, recovery
 and completion records around these existing lifecycle operations. It does not
@@ -139,12 +146,17 @@ The event contains these required fields:
 | `usage` | Fresh `{"kind":"git","scope":"exclusive","writers":[]}`; list each owned writer as `{"id":"worker","state":"stopped"}`; use `managed`, `shared` or `pinned` when applicable |
 | `files`, `snapshot`, `message`, `title` | Explicit relative file list, inspected digest, commit message, PR title |
 | `summary`, `progress`, `remaining`, `blockers` | Human-readable text; blocker text includes its resumption condition; `ready` requires no blockers |
-| `validation` | `snapshot` matching the event, `checks` list and one independent `review` entry |
+| `validation` | `snapshot` matching the event, `checks` list, one independent `review` entry, and `security` assessment required for READY |
 
 Each validation entry contains exactly `name`, `outcome` (`passed`, `failed` or
 `not_run`), `path` (private evidence file), and its SHA-256 `sha256`. A `ready`
 event requires at least one check and an independent review, all passed. Keep
 request/evidence files outside tracked source; requests are limited to 64 KiB.
+It also requires the [security evidence contract](security-validation.md#evidence-and-readiness):
+matching snapshot, risk/rationale, complete coverage, declared required checks
+and passing evidence for each. Old READY requests without this record block.
+Checkpoint/blocker/reopen may retain missing or stale security evidence so
+progress reporting and withdrawal remain possible; they never assert a pass.
 The task's schedule and publication identity remain fixed after first use;
 changed branches or destinations require explicit reconciliation of the inventory.
 
@@ -156,7 +168,7 @@ that section survive updates. Edited, missing, malformed or foreign managed
 sections require reconciliation.
 
 A PR may leave draft while still `[BLOCKED]` to receive reviews. `[READY]` requires
-current local evidence, confirmed non-draft status and observed passing checks,
+current local and security evidence, confirmed non-draft status and observed passing checks,
 reviews and mergeability for the exact head. Unknown remote facts remain pending.
 Before further edits to a ready PR, send `reopen` and verify `[BLOCKED]`; failure
 pauses that PR's implementation. Other publication failures can leave verified
@@ -195,6 +207,7 @@ must explicitly confirm those actions. The result says `delivery=user_confirmed`
 it never claims those remote facts were independently observed. Confirmation
 cannot override observed draft/failing readiness or publish uncommitted work, and
 cannot authorize automatic cleanup without independently observed merges.
+It cannot override missing, stale, incomplete or failing security evidence.
 
 If an existing READY claim pauses work and remote access remains unavailable,
 the user can instead confirm `actions: ["readiness_withdrawal"]`, naming the
@@ -278,3 +291,9 @@ there is no verified task record. Independent onboarding/upgrades use the existi
 component installer's check/install/check flow in the checkout permitted by project
 rules, preserving the opt-out. Ordinary authorized project delivery remains
 available outside this lifecycle helper.
+
+Security validation remains mandatory with either opt-out. Before release, run
+the read-only [release preflight](security-validation.md#release-preflight-including-lifecycle-opt-out)
+using `inspect ROOT --file ...` and `check-security ROOT`, without a task ID.
+Require exit 0 for the exact release revision in addition to project release
+checks; this helper does not intercept separate deployment tools.

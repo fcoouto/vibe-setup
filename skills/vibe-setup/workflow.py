@@ -740,12 +740,80 @@ def publish_paths(root: Path, files: list[str]) -> None:
 
 
 def publication_snapshot(task: dict, files: list[str]) -> dict:
-    binding, facts = setup_context(task)
-    root = Path(binding["worktree"])
+    binding, _ = setup_context(task)
+    return file_snapshot(Path(binding["worktree"]), files)
+
+
+def file_snapshot(root: Path, files: list[str]) -> dict:
+    facts = repository(root)
+    root = Path(facts["root"])
     publish_paths(root, files)
     payload = {"head": facts["head"], "files": {name: fingerprint(root / name) for name in files},
                "index": hashlib.sha256(git(root, "ls-files", "--stage", "-z").stdout.encode()).hexdigest()}
     return {**payload, "digest": hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()}
+
+
+def validate_evidence(entry: dict) -> None:
+    if (not isinstance(entry, dict) or set(entry) != {"name", "outcome", "path", "sha256"}
+            or not all(isinstance(entry[key], str) for key in entry)
+            or entry["outcome"] not in ("passed", "failed", "not_run") or not entry["name"].strip()):
+        raise ValueError("Provide named validation outcomes and local evidence fingerprints")
+    observed = fingerprint(Path(entry["path"]))
+    if observed is None or observed["sha256"] != entry["sha256"]:
+        raise ValueError("Local validation evidence is missing or changed")
+
+
+def validate_security(security: dict, snapshot: str) -> None:
+    fields = {"snapshot", "risk", "rationale", "status", "required_checks", "checks"}
+    if not isinstance(security, dict) or set(security) != fields:
+        raise ValueError("Provide the complete security assessment and required evidence")
+    if security["snapshot"] != snapshot:
+        raise ValueError("Security evidence must refer to the exact current snapshot")
+    if security["risk"] not in ("R0", "R1", "R2"):
+        raise ValueError("Classify security impact as R0, R1 or R2")
+    if (not isinstance(security["rationale"], str) or not security["rationale"].strip()
+            or len(security["rationale"]) > 8192 or "\0" in security["rationale"]):
+        raise ValueError("Record a bounded private security impact rationale")
+    if security["status"] != "complete":
+        raise ValueError("Incomplete security coverage blocks readiness and release")
+    required = security["required_checks"]
+    if (not isinstance(required, list) or not all(isinstance(name, str) and name.strip() for name in required)
+            or len(set(required)) != len(required)):
+        raise ValueError("Declare unique required security check names")
+    minimum = {"impact-review", "trailofbits-update-review"}
+    if security["risk"] in ("R1", "R2"):
+        minimum.add("security-validation")
+    if security["risk"] == "R2":
+        minimum.add("independent-security-review")
+    if not minimum <= set(required) or not isinstance(security["checks"], list):
+        raise ValueError("Required security checks must cover the declared risk")
+    names = []
+    for entry in security["checks"]:
+        validate_evidence(entry)
+        if entry["outcome"] != "passed":
+            raise ValueError("Every required security check must pass before readiness or release")
+        names.append(entry["name"])
+    if len(set(names)) != len(names) or set(names) != set(required):
+        raise ValueError("Supply exactly one passing evidence entry for every required security check")
+
+
+def require_clean_security_checkout(root: Path) -> None:
+    if git(root, "status", "--porcelain=v1", "--untracked-files=all").stdout:
+        raise ValueError("Security readiness/release requires a clean checkout of the reviewed revision")
+
+
+def check_security(root: Path, request: dict) -> dict:
+    if not isinstance(request, dict) or set(request) != {"files", "snapshot", "security"}:
+        raise ValueError("Provide release files, snapshot and security evidence")
+    root = Path(repository(root)["root"])
+    snapshot = file_snapshot(root, request["files"])
+    if snapshot["digest"] != request["snapshot"]:
+        raise ValueError("Release snapshot is stale; inspect and validate the release revision again")
+    require_clean_security_checkout(root)
+    validate_security(request["security"], snapshot["digest"])
+    return result("check-security", "ok", "validation_only", security="passed",
+                  risk=request["security"]["risk"], snapshot=snapshot["digest"], head=snapshot["head"],
+                  next_action="Security evidence passed for this revision; apply remaining release requirements and authorization")
 
 
 def validate_publication(publication: dict) -> None:
@@ -793,21 +861,18 @@ def validate_event(request: dict) -> None:
     if not isinstance(request["snapshot"], str) or not re.fullmatch(r"[0-9a-f]{64}", request["snapshot"]):
         raise ValueError("Provide the inspected publication snapshot digest")
     validation = request["validation"]
-    if not isinstance(validation, dict) or set(validation) != {"snapshot", "checks", "review"}:
+    if (not isinstance(validation, dict) or not {"snapshot", "checks", "review"} <= set(validation)
+            or set(validation) - {"snapshot", "checks", "review", "security"}):
         raise ValueError("Provide checks and independent review evidence for this snapshot")
     if not isinstance(validation["checks"], list) or validation["snapshot"] != request["snapshot"]:
         raise ValueError("Local acceptance must refer to the exact publication snapshot")
     for entry in [*validation["checks"], validation["review"]]:
-        if (not isinstance(entry, dict) or set(entry) != {"name", "outcome", "path", "sha256"}
-                or not all(isinstance(entry[key], str) for key in entry)
-                or entry["outcome"] not in ("passed", "failed", "not_run") or not entry["name"].strip()):
-            raise ValueError("Provide named validation outcomes and local evidence fingerprints")
-        observed = fingerprint(Path(entry["path"]))
-        if observed is None or observed["sha256"] != entry["sha256"]:
-            raise ValueError("Local validation evidence is missing or changed")
+        validate_evidence(entry)
     if request["kind"] == "ready" and (not validation["checks"] or any(
             entry["outcome"] != "passed" for entry in [*validation["checks"], validation["review"]])):
         raise ValueError("Current local checks and independent review must pass before readiness")
+    if request["kind"] == "ready":
+        validate_security(validation.get("security"), request["snapshot"])
 
 
 def lifecycle_path(binding: dict) -> Path:
@@ -927,13 +992,16 @@ def manual_actions(failure: dict, observed: dict) -> list[dict]:
              "push_command": shlex.join(["git", "-C", root, "push", publication["remote"], f"HEAD:refs/heads/{branch}"])}]
 
 
-def event_section(event: dict) -> str:
+def event_section(event: dict, tag: str = "BLOCKED") -> str:
     request = event["request"]
     validation = request["validation"]
     checks = "; ".join(f"{entry['name']}: {entry['outcome']}" for entry in [*validation["checks"], validation["review"]])
+    # Blocked events may carry stale/legacy evidence; never advertise it as passed.
+    security = (f"passed ({validation['security']['risk']})" if tag == "READY"
+                else "pending; required before readiness or release")
     return (f"### Summary\n{request['summary']}\n\n### Progress\n{request['progress']}\n"
             f"\nMilestone: {request['milestone']}\nEvent: {request['event_id']}\nCommit: {event['commit']}\n"
-            f"\n### Validation\n{checks}\nLocal evidence supplied by the coordinator for the recorded snapshot.\n"
+            f"\n### Validation\n{checks}\nSecurity: {security}.\nLocal evidence supplied by the coordinator for the recorded snapshot.\n"
             f"\n### Remaining work\n{request['remaining']}\n\n### Blockers and resumption\n{request['blockers'] or 'None reported.'}")
 
 
@@ -942,7 +1010,7 @@ def update_metadata(state: dict, event: dict, pr: dict, tag: str) -> dict:
     endpoint = f"repos/{publication['repository']}/pulls/{pr['number']}"
     latest = gh_api(publication, endpoint)
     inner = managed_section(latest.get("body") or "", task_id)
-    section = event_section(event)
+    section = event_section(event, tag)
     known = state["sections"].get(str(pr["number"]))
     if inner is not None and inner not in (known, "\n" + section + "\n"):
         raise RemoteFailure("metadata", "Managed PR content changed; reconcile the human edit before updating")
@@ -1041,6 +1109,11 @@ def sync_event(request: dict, task: dict) -> dict:
         binding, facts = setup_context(task)
         head = facts["head"]
         root = Path(binding["worktree"])
+        if request["kind"] == "ready":
+            publish_paths(root, request["files"])
+            if git(root, "status", "--porcelain=v1", "--untracked-files=all", "--", ".",
+                   *(":(exclude,literal)" + name for name in request["files"])).stdout:
+                raise ValueError("Dirty files outside the reviewed publication scope block security readiness")
         if binding["branch"] not in request["publication"]["branches"]:
             raise ValueError("Register the task branch in the publication inventory")
         if not load_policy(root):
@@ -1090,7 +1163,7 @@ def sync_event(request: dict, task: dict) -> dict:
                     and pr["head"]["sha"] == event.get("commit")):
                 # A lost update response must not repeat an already observed mutation.
                 event["delivered"] = True
-                state["sections"][str(pr["number"])] = "\n" + event_section(event) + "\n"
+                state["sections"][str(pr["number"])] = "\n" + event_section(event, "READY") + "\n"
                 state["last_ready"] = True
                 save_lifecycle(state)
             # Withdraw an existing readiness claim before staging or pushing new work.
@@ -1155,6 +1228,7 @@ def sync_event(request: dict, task: dict) -> dict:
             else:
                 pr = update_metadata(state, event, pr, "BLOCKED")
                 if request["kind"] == "ready":
+                    validate_security(request["validation"].get("security"), request["snapshot"])
                     if pr.get("draft"):
                         query = "mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{isDraft}}}"
                         try:
@@ -1164,6 +1238,18 @@ def sync_event(request: dict, task: dict) -> dict:
                         pr = gh_api(state["publication"], f"repos/{state['publication']['repository']}/pulls/{pr['number']}")
                     if pr.get("draft") or not readiness(state["publication"], pr):
                         raise RemoteFailure("readiness", "Remote checks, reviews or mergeability are not ready; retain [BLOCKED]")
+            if request["kind"] == "ready":
+                try:
+                    validate_security(request["validation"].get("security"), request["snapshot"])
+                    prepare_commit(state, event, task)
+                    require_clean_security_checkout(root)
+                except (ValueError, OSError):
+                    if event["delivered"]:
+                        event["delivered"] = False
+                        save_lifecycle(state)
+                        update_metadata(state, event, pr, "BLOCKED")
+                    raise
+                if not event["delivered"]:
                     pr = update_metadata(state, event, pr, "READY")
             event["delivered"] = True
             save_lifecycle(state)
@@ -1232,7 +1318,9 @@ def resume_lifecycle(root: Path, operation_id: str, confirmation: dict | None = 
             return {**response, "operation": "resume"}
         if (response["status"] == "action_required" and request["kind"] == "ready"
                 and response.get("failure_step") in ("access", "unknown", "remote", "actor", "identity", "create_unknown")):
+            validate_security(request["validation"].get("security"), request["snapshot"])
             target = Path(task["worktree"])
+            require_clean_security_checkout(target)
             if (any(fingerprint(target / name) != value for name, value in event["snapshot"]["files"].items())
                     or git(target, "status", "--porcelain=v1", "--untracked-files=all", "--", *(":(literal)" + name for name in request["files"])).stdout
                     or facts["head"] == event["snapshot"]["head"] and not event.get("commit")):
@@ -1439,7 +1527,7 @@ def main(argv: list[str] | None = None) -> int:
     update_operations = ("plan-update", "apply-update", "resume-update", "rollback-update", "record-update", "status-update")
     probe_operations = ("prepare-probe", "begin-probe", "record-probe", "status-probe")
     delegation_operations = ("plan-delegation", "report-delegation")
-    parser.add_argument("operation", choices=("inspect", "start", "apply", "sync", "resume") + update_operations + probe_operations + delegation_operations)
+    parser.add_argument("operation", choices=("inspect", "start", "apply", "sync", "resume", "check-security") + update_operations + probe_operations + delegation_operations)
     parser.add_argument("root", type=Path, help="Selected project/source checkout")
     parser.add_argument("--client", action="append", choices=("app", "vscode"), default=[])
     parser.add_argument("--task-id", help="Include a read-only setup plan for a verified task worktree")
@@ -1454,6 +1542,8 @@ def main(argv: list[str] | None = None) -> int:
                     output["setup_plan"] = plan_setup(task)
                 else:
                     output["publication_snapshot"] = publication_snapshot(task, args.file)
+            elif args.file is not None:
+                output["publication_snapshot"] = file_snapshot(args.root, args.file)
         else:
             payload = sys.stdin.read(65537)
             if len(payload) > 65536:
@@ -1468,6 +1558,10 @@ def main(argv: list[str] | None = None) -> int:
                 output = handler(args.operation, args.root, request, globals())
             elif args.operation == "start":
                 output = start_task(args.root, request)
+            elif args.operation == "check-security":
+                if args.client or args.task_id or args.file:
+                    raise ValueError("Security validation takes its explicit scope in the JSON request")
+                output = check_security(args.root, request)
             elif args.operation == "apply":
                 if not isinstance(request, dict) or set(request) != {"task_id", "plan"}:
                     raise ValueError("Provide task_id and the reviewed plan only")

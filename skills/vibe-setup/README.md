@@ -55,6 +55,21 @@ Use that complete prompt for the surrounding setup, not only this subagent packa
 On an update, resolve upstream once and record its immutable revision. Compare
 changes before updating an existing integration; preserve customizations.
 
+## Mandatory security validation
+
+Every normal task also follows [mandatory proportional security validation](security-validation.md).
+Reviews run at implementation-complete/READY, release/deployment, or an explicit
+user/project requirement. At those gates, impact and upstream update review are
+always required; behavior changes add targeted checks, and sensitive changes
+require independent security review. Use applicable Trail
+of Bits methods at a reviewed revision without changing model/provider settings
+or installing a universal scanner stack. The helper blocks READY and release
+preflight for missing, stale, incomplete or failing required evidence. Release
+preflight works with lifecycle disabled; external deployment pipelines must call
+it explicitly. Installation, execution and semantic coverage are separate evidence.
+Review upstream changes before adoption, reuse valid evidence, and rerun only
+affected checks; draft worktrees do not automatically trigger audits.
+
 ## Difficulty-based worker selection
 
 Read [the selection policy](delegation-brief.md#difficulty-based-worker-selection).

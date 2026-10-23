@@ -153,7 +153,12 @@ class PublicationFixture(WorkflowFixture):
                 "snapshot": snapshot["digest"], "message": "feat: fixture change", "title": "Fixture feature",
                 "summary": "Implement the fixture feature.", "progress": "Phase complete.",
                 "remaining": "None.", "blockers": "", "validation": {"snapshot": snapshot["digest"],
-                    "checks": [proof], "review": {**proof, "name": "independent review"}}}
+                    "checks": [proof], "review": {**proof, "name": "independent review"},
+                    "security": {"snapshot": snapshot["digest"], "risk": "R0", "status": "complete",
+                        "rationale": "Synthetic text fixture has no executable behavior.",
+                        "required_checks": ["impact-review", "trailofbits-update-review"],
+                        "checks": [{**proof, "name": name}
+                                   for name in ("impact-review", "trailofbits-update-review")]}}}
 
     def sync(self, request):
         return self.workflow.sync_event(request, self.task)

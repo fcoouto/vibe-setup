@@ -194,6 +194,17 @@ class UpdateTests(unittest.TestCase):
         self.assertFalse(result["complete"])
         self.assertEqual(self.row(result)["state"], "pending")
 
+    def test_security_contract_changes_invalidate_client_evidence(self):
+        first = self.call("plan-update", self.request)
+        (self.candidate / "security-validation.md").write_text("Changed security review requirements.\n")
+        self.git(self.source, "add", ".")
+        self.git(self.source, "commit", "-qm", "security contract")
+        self.record = self.home / "records" / str(uuid4())
+        self.request.update(operation_id=self.record.name, record_dir=str(self.record),
+                            revision=self.git(self.source, "rev-parse", "HEAD"))
+        second = self.call("plan-update", self.request)
+        self.assertNotEqual(self.row(first)["fingerprint"], self.row(second)["fingerprint"])
+
     def test_three_way_conflict_preserves_custom_file_and_independent_install(self):
         custom = self.project / ".codex/delegation-brief.md"
         custom.write_text("User-owned customization\n")

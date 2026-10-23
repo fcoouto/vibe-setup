@@ -70,7 +70,20 @@ then remove the exact clean worktree through its owner without force. Keep local
 branch refs; preserve ambiguous, shared or dirty resources and explicit opt-outs.
 Installation, client discovery and actual execution are separate evidence.
 
-For reusable read-only security review, use
+Every task must follow [proportional security validation](skills/vibe-setup/security-validation.md)
+at implementation-complete/READY/production candidate, release/deployment, or an
+explicit user/project requirement. Within those gates, assess impact, check
+Trail of Bits updates and review relevant changes before adoption. Reuse valid
+evidence, preserve model/provider settings and bind
+private evidence to the current snapshot. Missing, stale, incomplete or failing
+required checks, including `trailofbits-update-review`, block READY and release.
+Draft edits and worktree creation do not independently trigger security reviews.
+Use the reviewed helper's `check-security`
+for the exact release commit even with lifecycle disabled. If the installed
+helper predates that command, upgrade it through the reviewed update workflow
+before release; an older helper's success is not security evidence.
+
+For complementary reusable read-only security review, use
 [Vibe Prompt 13](https://github.com/soumatheusgomes/vibe-coding-toolkit/blob/790a895304e0c08b70a5b215c9d334f1c86b816c/docs/prompts/13-security-review.md)
 against an explicit revision/diff, keeping redacted findings private. Use
 [Prompt 14](https://github.com/soumatheusgomes/vibe-coding-toolkit/blob/790a895304e0c08b70a5b215c9d334f1c86b816c/docs/prompts/14-harness-evaluation.md)

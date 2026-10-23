@@ -404,7 +404,8 @@ def build_plan(root, request, candidate, workflow):
         if requirement["layer"] in CLIENT_LAYERS:
             inputs = {"files": {name: value for name, value in files.items() if name.startswith(".codex/")},
                       "instructions": {name: value for name, value in package["manifest"].items()
-                                       if name in {"SKILL.md", "delegation-brief.md", "task-lifecycle.md", "native_qualification.py"}},
+                                       if name in {"SKILL.md", "delegation-brief.md", "task-lifecycle.md",
+                                                   "security-validation.md", "native_qualification.py"}},
                       "context": target["clients"][requirement["client"]], "exclusions": target["exclusions"]}
         else:
             inputs = {"package": package["digest"], "files": files}
