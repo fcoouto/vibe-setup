@@ -67,7 +67,7 @@ def display_role(event, role):
     return event
 
 
-def enrich_event(event, codex_home, harness_root=None):
+def enrich_event(event, codex_home, harness_root=None, umbrella_root=None):
     """Preserve supplied roles; derive absent/null roles only from a bound declaration."""
     if not isinstance(event, dict) or event.get("hook_event_name") != "SubagentStart":
         return event
@@ -86,6 +86,14 @@ def enrich_event(event, codex_home, harness_root=None):
             return event
         cwd = Path(meta["cwd"]).resolve(strict=True)
         root = harness_root.resolve(strict=True) if harness_root is not None else cwd
+        if umbrella_root is not None:
+            if harness_root is not None or not umbrella_root.is_absolute() or ".." in umbrella_root.parts:
+                return event
+            if cwd.is_relative_to(umbrella_root):
+                # An unrelated or unavailable umbrella must not redirect another project's lookup.
+                if umbrella_root.resolve(strict=True) != umbrella_root:
+                    return event
+                root = umbrella_root
         if not cwd.is_relative_to(root):
             return event
         brief = subagents.read_brief(task_path.rsplit("/", 1)[1], root)
@@ -100,8 +108,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--codex-home", type=Path,
                         default=Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")))
-    parser.add_argument("--harness-root", type=Path,
+    roots = parser.add_mutually_exclusive_group()
+    roots.add_argument("--harness-root", type=Path,
                         help="Explicit declaration root; otherwise the native rollout cwd, without ancestor search")
+    roots.add_argument("--umbrella-root", type=Path,
+                       help="Canonical absolute declaration root for workers within it; other workers retain cwd lookup")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="-- followed by the original hook executable and arguments")
     args = parser.parse_args()
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
@@ -111,7 +122,7 @@ def main():
     if len(raw) <= subagents.MAX_INPUT:
         try:
             event = subagents.load_json(raw)
-            enriched = enrich_event(event, args.codex_home, args.harness_root)
+            enriched = enrich_event(event, args.codex_home, args.harness_root, args.umbrella_root)
             if enriched != event:
                 raw = json.dumps(enriched).encode()
         except (ValueError, TypeError, RecursionError):

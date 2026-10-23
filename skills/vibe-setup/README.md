@@ -316,6 +316,13 @@ hook sources accumulate: if guards anchored to different roots are active, inspe
 and deliberately reconcile their configuration scope. Do not mirror declarations
 or search other roots to conceal an unidentified active hook.
 
+The optional shared display wrapper has separate root configuration. For a
+non-Git umbrella whose active guard owns child-worker declarations, explicitly
+configure its [scoped umbrella root](native-display.md#explicit-setup) with
+`--umbrella-root /absolute/umbrella`. Workers outside that root retain cwd lookup;
+installation does not activate or reconfigure the wrapper. A correct guard root
+alone does not establish correct display delivery.
+
 Adapt the entry-point template into the existing `AGENTS.md`; the installer does
 not overwrite project instructions. Add the policy link to the existing human
 documentation entry point too. The [policy and contract](delegation-brief.md)

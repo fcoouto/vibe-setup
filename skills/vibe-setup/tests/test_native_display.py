@@ -53,8 +53,8 @@ class NativeDisplayTests(unittest.TestCase):
     def write_meta(self):
         self.rollout.write_text(json.dumps({"type": "session_meta", "payload": self.meta}) + "\n")
 
-    def enrich(self, event=None, root=None):
-        return self.adapter.enrich_event(self.event if event is None else event, self.home, root)
+    def enrich(self, event=None, root=None, umbrella=None):
+        return self.adapter.enrich_event(self.event if event is None else event, self.home, root, umbrella)
 
     def test_derives_role_from_bound_declaration_only_in_display_copy(self):
         original = copy.deepcopy(self.event)
@@ -143,6 +143,80 @@ class NativeDisplayTests(unittest.TestCase):
         self.rollout.with_name(f"rollout-fixture-{second}.jsonl").write_text(json.dumps({"type":"session_meta", "payload":meta}) + "\n")
         self.assertEqual(self.enrich()["agent_role"], "Reviewer")
         self.assertEqual(self.enrich(dict(self.event, agent_id=second))["agent_role"], "Builder")
+
+    def test_shared_wrapper_uses_explicit_non_git_umbrella_for_nested_worker(self):
+        service = self.project / "service"
+        (service / ".git").mkdir(parents=True)
+        self.event["cwd"] = self.meta["cwd"] = str(service)
+        self.write_meta()
+        command = [sys.executable, '-B', str(SCRIPT), '--codex-home', str(self.home),
+                   '--umbrella-root', str(self.project), '--', sys.executable, '-B',
+                   '-c', 'import sys; sys.stdout.buffer.write(sys.stdin.buffer.read())']
+        result = subprocess.run(command, input=json.dumps(self.event).encode(),
+                                capture_output=True, timeout=3)
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+        self.assertEqual(json.loads(result.stdout),
+                         dict(self.event, agent_role="Reviewer", agent_type="Reviewer"))
+        self.assertFalse((self.project / ".git").exists())
+        self.assertFalse((service / ".codex-delegations").exists())
+
+    def test_umbrella_selection_is_authoritative_without_local_fallback(self):
+        service = self.project / "service"
+        records = service / ".codex-delegations"
+        records.mkdir(parents=True)
+        (records / "reader.json").write_text(json.dumps(dict(self.brief, role="Builder")))
+        self.event["cwd"] = self.meta["cwd"] = str(service)
+        self.write_meta()
+        self.assertEqual(self.enrich()["agent_role"], "Builder")
+        self.assertEqual(self.enrich(umbrella=self.project)["agent_role"], "Reviewer")
+        self.record.write_text(json.dumps(dict(self.brief, role="Wizard")))
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+        self.record.unlink()
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+        self.record.symlink_to(records / "reader.json")
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+
+    def test_umbrella_does_not_redirect_unrelated_or_prefix_sibling_projects(self):
+        for name in ("other", "project-other"):
+            other = self.root / name
+            records = other / ".codex-delegations"
+            records.mkdir(parents=True)
+            (records / "reader.json").write_text(json.dumps(dict(self.brief, role="Builder")))
+            self.event["cwd"] = self.meta["cwd"] = str(other)
+            self.write_meta()
+            self.assertEqual(self.enrich(umbrella=self.project)["agent_role"], "Builder")
+        self.assertEqual(self.enrich(umbrella=self.root / "missing")["agent_role"], "Builder")
+
+    def test_symlink_outside_umbrella_cannot_borrow_its_declaration(self):
+        outside = self.root / "outside"
+        outside.mkdir()
+        link = self.project / "service"
+        link.symlink_to(outside, target_is_directory=True)
+        self.event["cwd"] = self.meta["cwd"] = str(link)
+        self.write_meta()
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+
+    def test_umbrella_keeps_native_role_precedence_and_identity_checks(self):
+        with patch.object(self.adapter, "find_metadata", side_effect=AssertionError("must not read")):
+            event = dict(self.event, agent_role="Native")
+            self.assertEqual(self.enrich(event, umbrella=self.project)["agent_type"], "Native")
+        self.meta["source"]["subagent"]["thread_spawn"]["agent_role"] = "Native"
+        self.write_meta()
+        with patch.object(self.adapter.subagents, "read_brief", side_effect=AssertionError("must not derive")):
+            self.assertEqual(self.enrich(umbrella=self.project)["agent_type"], "Native")
+        self.assertEqual(self.enrich(dict(self.event, session_id=CHILD), umbrella=self.project),
+                         dict(self.event, session_id=CHILD))
+
+    def test_umbrella_rejects_relative_traversing_and_conflicting_roots(self):
+        for root in (Path("project"), self.project / ".." / "project"):
+            self.assertEqual(self.enrich(umbrella=root), self.event)
+        self.assertEqual(self.enrich(root=self.project, umbrella=self.project), self.event)
+        command = [sys.executable, '-B', str(SCRIPT), '--harness-root', str(self.project),
+                   '--umbrella-root', str(self.project), '--', sys.executable, '-c',
+                   'raise AssertionError("must not run")']
+        result = subprocess.run(command, input=b'{}', capture_output=True, timeout=3)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(b'not allowed with argument', result.stderr)
 
     def test_non_start_events_and_malformed_ids_are_unchanged(self):
         for update in ({"hook_event_name":"PermissionRequest"}, {"hook_event_name":"PreToolUse"},
