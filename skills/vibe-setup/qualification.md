@@ -41,6 +41,9 @@ approval; current discovery still needs evidence. No direct trust-store edits.
 An unresolved exclusion, stale discovery, or ambiguous accumulated guard stays
 open in the update record. A CLI's `source=vscode` metadata alone does not identify
 which desktop client performed the run.
+App metadata accepts the observed `Codex Desktop` originator and its historical
+`codex_work_desktop` spelling; VS Code requires `codex_vscode`. These exact names
+do not replace current thread/root binding or trusted hook-source evidence.
 
 Create the complete declaration at the **host thread's harness root**. Require a
 canonical role, nonempty specialty, `read_only: true`, and `budget.attempts: 1`.
@@ -142,7 +145,9 @@ corrections, workspace preservation and protected hashes. Known mutation and ext
 delegation tool events fail a read-only probe. This is evidence checking, not a
 sandbox or proof against arbitrary concealed shell side effects. Inherited transcript history does not count as
 child execution. It supports the package's tested Codex JSONL event shapes;
-unrecognized layouts remain unqualified.
+unrecognized layouts remain unqualified. Observed read outputs may use JSON
+`output`, `text`, `content`, or `result` wrappers; their native call IDs must still
+match the corresponding read call.
 
 For a selected worker's fresh history, the native session metadata must bind the
 child to the dispatched parent, task name, root and creation time. The first

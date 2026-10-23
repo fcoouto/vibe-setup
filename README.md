@@ -5,6 +5,17 @@ A reusable Codex skill for adopting, repairing, updating and verifying the
 in existing projects. It covers project instructions, applicable integrations,
 native subagents, validation and independent review.
 
+[Security validation](skills/vibe-setup/security-validation.md) has three gates:
+implementation-complete/READY/production candidate, release/deployment, or an
+explicit user/project requirement. Each includes impact and Trail of Bits update
+review; behavior changes add targeted validation, and sensitive boundaries require
+independent review. Review relevant updates before adoption and reuse valid
+evidence rather than auditing every draft worktree. Trail of Bits methods
+are selected proportionally while preserving model/provider settings. The helper
+blocks READY and release preflight when required evidence is missing, stale,
+incomplete or failing. Separate deployment pipelines must invoke that preflight;
+installing the skill does not intercept arbitrary release commands.
+
 ## Delegation and model policy
 
 Start with the [delegation policy](skills/vibe-setup/delegation-brief.md):

@@ -33,8 +33,11 @@ task record is created. For onboarding or upgrades, use the reviewed component
 installer's check/install/check flow in the checkout permitted by existing project
 rules. Preserve the opt-out and use ordinary authorized project delivery.
 
-With lifecycle enabled, plan at most four checkpoints, or one synchronization per
-phase. Stop writers and use `sync` with explicit files and current evidence. PRs start draft `[BLOCKED]`;
+With lifecycle enabled, plan at most four routine checkpoints, or one per phase.
+READY, reopen and blocker transitions do not consume that budget. Use a fresh
+READY event within an existing milestone when inputs change; preserve old requests
+and require all readiness gates. Stop writers and use `sync` with explicit files
+and current evidence. PRs start draft `[BLOCKED]`;
 `[BLOCKED]`, `[READY]` and `[SUPERSEDED]` are valid lifecycle title states.
 Apply `[SUPERSEDED]` through the helper to record its successor and close the PR.
 Update the PR before reporting a blocker in chat; if unavailable, report
@@ -48,6 +51,30 @@ fails. Reconcile the same event before retrying; never create duplicate PRs blin
 or auto-merge. Installed settings do not authorize unrelated publication.
 
 ## Working procedure
+
+Security validation uses exactly three gates: implementation-complete/READY/
+production candidate, release/deployment (including hotfixes and lifecycle opt-out),
+or an explicit user/project requirement. The first two need no separate request.
+Read [absolute path to the installed Vibe Setup `security-validation.md`].
+At a gate, record actual scope, risk R0/R1/R2 and required checks.
+Use applicable Trail of Bits methods proportionally, preserving current
+model/provider/reasoning/authentication and permissions. R0 requires an impact
+review; R1 adds targeted security validation; R2 adds independent security review.
+Keep reports private and bind complete passing evidence to the current snapshot.
+Missing, stale, incomplete or failing required evidence blocks readiness/release.
+Before release, run the helper's read-only `check-security` against a clean checkout
+of the exact release commit, alongside existing release checks. This also applies
+when lifecycle is disabled. Preserve blocked checkpoint and withdrawal paths;
+manual confirmations cannot bypass security. External release pipelines need an
+explicit preflight integration; hooks do not enforce this entire policy.
+Within each gate, check official Trail of Bits updates and review applicable
+changes before adopting a pinned revision. Record `trailofbits-update-review`
+evidence at every tier. Reuse a metadata lookup within the same gate run; refresh
+it for a later/resumed run. A newer version alone does not require adoption or
+a full audit. Reuse proven applicable evidence and rerun only invalidated checks.
+Draft worktrees get normal focused implementation tests, not automatic audits.
+Changes/findings invalidate evidence without creating another review trigger;
+keep incomplete drafts BLOCKED and resolve required gaps before gate acceptance.
 
 Read active instructions, relevant code and contracts before editing. Preserve
 existing work. Define acceptance checks, make the smallest complete change, run

@@ -14,6 +14,20 @@ path. The component installer still covers only the subagent guard. Use the
 [onboarding guide](onboarding.md) and [lifecycle contract](task-lifecycle.md) for
 the helper request schemas, recovery and manual actions.
 
+Apply [mandatory proportional security validation](security-validation.md) to
+every task and install its normal-task requirement in project instructions.
+Select Trail of Bits methods by actual change impact while preserving the user's
+model/provider settings. READY and release require current, complete, passing
+required security evidence; lifecycle opt-outs and manual publication do not waive
+it. Reuse the helper's security gate and explicit release preflight. Distinguish
+workflow enforcement from external CI/deployment integration and report truth.
+Use only the three [review triggers](security-validation.md#review-triggers):
+implementation-complete/READY/production candidate, release/deployment, or an
+explicit user/project requirement. Within each gate, check Trail of Bits updates,
+review relevant changes before adoption, and record `trailofbits-update-review`
+evidence. Reuse applicable evidence and rerun only invalidated checks. Draft edits,
+scope changes and worktree creation do not independently trigger audits.
+
 Delegation follows Vibe's [policy and execution contract](delegation-brief.md).
 Prefer enabled, approved local models through the installed `local-model-delegation`
 plugin when the full task fits assessed capability and safe capacity. Otherwise
@@ -118,7 +132,8 @@ queued archival remain named dependencies with next actions, never completion.
    Install the template's normal-task lifecycle instructions into the project's
    existing guide, resolving the actual installed helper path. Routine tasks use
    those instructions directly; they must not repeat complete Vibe onboarding.
-5. **Validate.** Run project-native checks, applicable live integrations and
+5. **Validate.** Complete the selected security checks with snapshot-bound private
+   evidence under the security contract. Run project-native checks, applicable live integrations and
    disposable harness cases. Confirm the resolved project configuration layer is
    trusted and loaded before requesting hook approval; untrusted project hooks
    may be absent from the approval list. Follow [client qualification](README.md#3-establish-trust-and-actual-execution).
@@ -139,12 +154,15 @@ queued archival remain named dependencies with next actions, never completion.
    canonical setup/quality documentation and maintenance triggers. Report changes,
    checks, review coverage, limits, pending interventions and next action.
    When lifecycle is enabled, publish under the target's actual authorization and
-   readiness policy using `sync`: no more than four planned unphased checkpoints, or one synchronization per phase.
+   readiness policy using `sync`: no more than four planned unphased checkpoints, or one routine checkpoint per phase.
+   READY, reopen and blocker transitions reuse planned milestones without consuming
+   that budget. Use a fresh READY event for refreshed inputs; preserve old requests
+   and rerun all readiness gates, reusing only applicable evidence.
    Stop writers before snapshotting. Create PRs draft with `[BLOCKED]`, preserve
    human content, and verify remote head/metadata before claiming synchronization.
    Blockers stop implementation: update the PR before chat; if that fails, report
    “blocked; PR update pending” with the exact manual action. `[READY]` requires
-   checks/review, non-draft status and applicable remote readiness. Withdraw READY
+   checks/review, security evidence, non-draft status and applicable remote readiness. Withdraw READY
    before further implementation, pausing that PR if withdrawal cannot be observed
    or explicitly confirmed. Distinguish implementation, delivery and cleanup;
    attribute human confirmations and never infer remote facts from local records.

@@ -104,7 +104,8 @@ def validate_observation(observation, root, meta, wf):
             or not nonblank(observation["runtime"])
             or observation["observed_via"] not in ("native-ui", "native-app-tool")):
         raise ValueError("Client observation does not bind this native thread and harness root")
-    if meta.get("originator") != {"app": "codex_work_desktop", "vscode": "codex_vscode"}[observation["client"]]:
+    originators = {"app": ("codex_work_desktop", "Codex Desktop"), "vscode": ("codex_vscode",)}
+    if meta.get("originator") not in originators[observation["client"]]:
         raise ValueError("Native originator does not identify the observed client; CLI evidence cannot substitute")
     sources = observation["hook_sources"]
     if not isinstance(sources, list) or len(sources) != 1:
@@ -360,7 +361,7 @@ def output_strings(value):
         for item in value:
             yield from output_strings(item)
     elif isinstance(value, dict):
-        for key in ("output", "text", "content"):
+        for key in ("output", "text", "content", "result"):
             if key in value:
                 yield from output_strings(value[key])
 
