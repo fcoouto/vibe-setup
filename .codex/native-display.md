@@ -34,8 +34,9 @@ The shared badge policy calls for `<Role> · <Model Display Name>`. This adapter
 currently supplies only the role; it does not yet implement that complete format.
 The native model remains visible through Habblaud's existing session statistics.
 
-The reader checks only a bounded first metadata line, never task messages. It checks
-the current UTC day, adjacent days and the parent's transcript directory; unsupported
+The reader checks only bounded first metadata lines, never task messages. It checks
+the current UTC day, adjacent days, the parent's transcript directory and, for native
+UUIDv7 identities, the identity's creation day and adjacent days. Unsupported
 layouts or unavailable rollout metadata retain the original label. No session logs
 are rewritten. Declarations use the guard's bounded, no-symlink regular-file reader.
 
@@ -64,6 +65,48 @@ By default, declarations come from the native rollout's `cwd`, without searching
 ancestor Git roots. If a known umbrella harness owns the declarations, add
 `--harness-root /absolute/harness` before `--`. The native cwd must be within that
 explicit root. Do not guess a different declaration root when the record is missing.
+
+For a shared account hook serving both an umbrella and unrelated projects, use
+`--umbrella-root /absolute/umbrella` instead of `--harness-root`. This explicit mapping
+asserts that sessions originating at that exact canonical root use its guard. For
+a worker inside the umbrella, the adapter follows the bound native parent chain to
+the originating session's initial cwd. It selects the umbrella declarations only
+when that cwd equals the configured root. A standalone session originating in a
+child repository retains its existing worker-cwd lookup. Other projects retain
+that lookup without ancestry reads, even if the unrelated umbrella directory is
+unavailable. The two options are mutually
+exclusive; existing strict `--harness-root` behavior is unchanged.
+
+For example, a non-Git `/workspace/product` may own the active guard and
+`/workspace/product/.codex-delegations/reader.json`, while a worker starts in its
+child repository `/workspace/product/docs`. Configure the reviewed shared wrapper:
+
+```sh
+python3 -B /path/to/native_display.py --codex-home /path/to/codex-home --umbrella-root /workspace/product -- node /path/to/hook.mjs
+```
+
+Use an absolute canonical umbrella path without symlinks or `..`. Confirm that
+this root owns the active guard for sessions originating there; native metadata
+does not attest which guard a client loaded. Arbitrary configurations where a
+session's initial cwd differs from its guard root need a separately scoped
+integration. A bound umbrella-owned child uses the umbrella declaration, even if a
+nearer repository has a declaration with the same task name. A standalone child-repo
+session never borrows an umbrella declaration. Missing, invalid or unsafe selected
+declarations leave the event unchanged;
+they never fall back to a child repository. Prefix siblings and symlink paths
+resolving outside the umbrella cannot borrow its declarations. No Git repository
+is required at the umbrella root, and no declarations are copied or searched for
+in ancestor directories. Parent IDs and nested task paths must agree at every
+ancestry step. The lookup is limited to 16 parent records and recognized native
+root sources (`cli`, `exec`, `vscode`). Missing, ambiguous, cyclic, unsafe or
+unsupported ancestry leaves covered events unchanged; it does not trigger a
+declaration fallback. No ownership cache can outlive the current native evidence.
+
+Package updates leave this integration inert. Adoption requires separately
+updating the reviewed shared adapter and its existing hook command, preserving
+unrelated hooks and client trust. Do not restart or interrupt active workers to
+apply this repair. Verify delivery with a future authorized fresh worker; existing
+Habblaud labels remain subject to the first-observation limitation below.
 
 Review and trust the changed hook through the client's supported interface when
 required. Never write trust hashes. Existing sessions may need a supported refresh

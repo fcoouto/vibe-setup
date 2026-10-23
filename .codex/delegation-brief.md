@@ -533,6 +533,9 @@ Actual behavior still requires a real client fixture.
    and its actual diff/checks/report. Compare trusted child identity when available;
    otherwise retain the explicit unverified-binding risk. A structurally valid
    record or report is not evidence of successful work.
+   Retain the native child ID, parent/task binding and inherited worktree attachment
+   in existing private task evidence for later native cleanup; names and cwd alone
+   do not establish ownership.
 
 Use this required argument shape, replacing the example name and root together:
 
@@ -615,7 +618,13 @@ An independent reader's `.codex-delegations/parser_review.json` for native
 
 ## Lightweight cleanup worker
 
-Post-merge cleanup must remain inexpensive. Use one bounded native worker on a
+After confirmed merge or recorded supersession, queued cleanup runs directly in
+Python over every eligible pending retirement handoff in the same Git repository.
+Startup never runs cleanup. Do not spawn a worker, model turn, timer or poll for
+that queue pass. Unsupported managed removals remain pending for their native owner.
+The profile below applies only when cleanup delegation is separately needed.
+
+Terminal-task cleanup must remain inexpensive. When delegating, use one bounded native worker on a
 lightweight compatible model available in the current authenticated client.
 Choose from the host's supported models and reasoning settings; do not hard-code
 a model family or version. Keep the coordinator's model/settings unchanged. Never
@@ -624,27 +633,40 @@ If no suitable native choice is available, report the limitation and offer the
 helper's manual invocation; do not silently upgrade to an expensive worker.
 
 Python performs the factual safety checks and ordered deletions. The worker runs
-one lifecycle `resume` invocation from outside the target worktree, using the
-existing event ID and a fresh report of worktree ownership and stopped writers.
-The helper confirms every associated PR merged, checks the local worktree and
-branch identities, deletes remote refs conditionally, verifies absence, then
-removes the exact worktree without force. The worker must never substitute its
-own recursive deletion, force push, stale receipt or approval assertion.
+one lifecycle `cleanup` invocation from outside the target worktree, using its
+existing task ID and a fresh report of worktree ownership and stopped writers.
+An existing event ID can still use `resume`. The helper confirms merged PRs or
+recorded supersession, checks ownership and heads, and applies independent default-ON
+`delete_remote_branches` / `delete_worktrees` options. It deletes eligible remote
+refs before local removal when both actions are enabled; either option may be
+opted out independently. Closed-unmerged PRs retain remote branches and worktrees unless explicitly
+superseded. Local refs remain as the recovery copy. Native worktrees return an
+owner action; the coordinator first follows `native_action.preflight` in the installed
+helper's `task-lifecycle.md`. Only verified completed task children with inherited
+attachments may be archived; running, unfinished or uncertain children stay intact.
+The coordinator performs the owner action and a bounded follow-up
+`cleanup` verifies path and Git-registration absence. Queued archives stay pending.
+The worker must never substitute its own recursive deletion, force push, stale
+receipt or approval assertion.
 
 Declare a three-minute, one-attempt budget. Scope writable resources to the exact
-worktree, its recorded remote refs and its Git-common-directory lifecycle record;
-use `read_only=false` because cleanup has authorized mutations. Keep other tasks,
-branches, the primary checkout and local branch refs outside that scope. Respect
-`auto_cleanup=false` and whole-lifecycle opt-out before any deletion.
+task and eligible queued retirement handoffs within the same Git common directory,
+their recorded remote refs and lifecycle records;
+use `read_only=false` because cleanup has authorized mutations. Keep unmarked, active, foreign and ambiguously owned resources, the primary
+checkout and local branch refs outside that scope. Respect
+`delete_remote_branches=false`, `delete_worktrees=false`, the legacy
+`auto_cleanup=false` master opt-out and whole-lifecycle opt-out before deletion.
 
 Do not inspect the codebase, rerun project tests/builds, repeat independent review,
 spawn other workers, poll GitHub or create a recurring task for cleanup. Trigger
-only when reconciliation first observes merges, including after a human merge
-report. On a pending result, report the precise manual action and stop; retry only
-after new evidence or the requested action. Completed cleanup uses its recorded
+only when reconciliation confirms merge or recorded supersession, including after
+a human report of that transition. Each closure visits all eligible queued retirement
+handoffs in that repository once and reports `pending_cleanup.tasks`. Startup never
+runs cleanup; it only cancels retirement before checkout reuse. On a pending result, report the precise manual
+action and stop; retry only after new evidence or the requested action. Completed cleanup uses its recorded
 result and does not start another worker merely to recheck unchanged state.
 
-Return the existing compact report schema: observed merged PR count, remote refs
+Return the existing compact report schema: observed merged/superseded PR counts, remote refs
 confirmed absent, worktree removal status, evidence reference and any pending
 action. The coordinator reads that result and the bounded helper evidence; it does
 not repeat the full cleanup investigation with a larger model. These are workflow
