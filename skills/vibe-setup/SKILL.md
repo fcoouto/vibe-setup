@@ -150,13 +150,23 @@ queued archival remain named dependencies with next actions, never completion.
    attribute human confirmations and never infer remote facts from local records.
    Missing automation gets concrete manual lookup/push/PR steps and same-event
    recovery, not a new account, duplicate PR or silent completion. Never auto-merge.
-8. **Clean up cheaply after merge.** When reconciliation first observes merges,
-   follow the bounded lightweight worker profile in [delegation](delegation-brief.md).
-   Unless opted out, Python must confirm all associated PRs merged and resources
-   safe, delete and verify remote branches first, then remove the exact worktree
-   without force. Keep local branch refs. Use fresh ownership/writer information
-   and resume from outside the target. No polling, build/review reruns, fixed model
-   name or silent expensive fallback; pending cleanup gets one precise action.
+8. **Close superseded work and clean up terminal tasks.** Apply `[SUPERSEDED]`
+   through the lifecycle contract's `supersede` command with a verified replacement;
+   it records intent, preserves human content and closes predecessor PRs. Support
+   unpublished predecessors through their explicit publication inventory. Never
+   infer supersession from a title alone or discard uncommitted work.
+   When reconciliation observes merge, closure or supersession, follow the bounded
+   cleanup profile in [delegation](delegation-brief.md). Independent options
+   `delete_remote_branches` (merged/closed PRs) and `delete_worktrees`
+   (merged/recorded supersession) default ON. Preserve each opt-out and the legacy
+   `auto_cleanup=false` master switch. Keep local branch refs and all ownership,
+   dirty-file, writer and branch safeguards. When both actions are enabled, verify
+   remote absence before local removal; a remote opt-out permits independent local
+   removal. For `native_action`, use the exact worktree's native owner and run
+   `cleanup` again from the source; queued archival stays pending until filesystem
+   and Git registration absence are verified. Persist/report each pending outcome
+   and precise next action. No polling, build/review reruns or silent expensive
+   fallback; installation alone does not prove actual-client cleanup.
 
 Finish the applicable work; an installer success or a plan alone is insufficient.
 Proven external blockers remain explicit. Do not install machine prerequisites,

@@ -417,7 +417,11 @@ class PublicationTests(PublicationFixture):
         self.assertEqual(response["status"], "action_required")
         self.prs.pop()
         self.prs[0]["state"] = "closed"
-        self.assertEqual(self.sync(request)["status"], "action_required")
+        response = self.sync(request)
+        self.assertEqual(response["cleanup"], "complete", response)
+        self.assertTrue(self.target.exists())
+        self.assertEqual(self.git(self.remote, "for-each-ref", "--format=%(objectname)",
+                                  "refs/heads/" + self.request["branch"]), "")
         self.assertEqual(sum(endpoint.endswith("/pulls") and method == "POST" for endpoint, method, _, _ in self.calls), 1)
 
     def test_divergent_remote_refuses_force_push(self):
