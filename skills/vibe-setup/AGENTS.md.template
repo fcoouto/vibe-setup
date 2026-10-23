@@ -18,7 +18,8 @@ instructions and nested guides; do not replace the whole file mechanically.
 - Reviewed installed helper: [absolute path to the installed Vibe Setup `workflow.py`].
 - Lifecycle contract: [absolute path to the same package's `task-lifecycle.md`].
 - Preferences: `.codex/vibe-workflow.toml`; lifecycle and automatic cleanup default
-  ON. Preserve independent `enabled=false` and `auto_cleanup=false` choices.
+  ON. Preserve `enabled=false`, the `auto_cleanup=false` master opt-out, and
+  independent `delete_remote_branches=false` / `delete_worktrees=false` choices.
 
 For normal tasks, use this helper directly; do not rerun full Vibe onboarding.
 Inspect first. Before implementation, create/adopt and verify a linked worktree
@@ -34,8 +35,10 @@ rules. Preserve the opt-out and use ordinary authorized project delivery.
 
 With lifecycle enabled, plan at most four checkpoints, or one synchronization per
 phase. Stop writers and use `sync` with explicit files and current evidence. PRs start draft `[BLOCKED]`;
-only `[BLOCKED]` and `[READY]` are valid lifecycle title states. Update the PR before
-reporting a blocker in chat; if unavailable, report “blocked; PR update pending”.
+`[BLOCKED]`, `[READY]` and `[SUPERSEDED]` are valid lifecycle title states.
+Apply `[SUPERSEDED]` through the helper to record its successor and close the PR.
+Update the PR before reporting a blocker in chat; if unavailable, report
+“blocked; PR update pending”.
 Verify remote commit and metadata before marking synchronization complete. READY
 requires checks/review, non-draft status and applicable remote readiness. Restore
 BLOCKED before further changes; unresolved withdrawal pauses that PR's work.
@@ -94,13 +97,19 @@ and the native contract below.
 Keep current route/model evidence and qualification gaps in [existing private
 setup/quality record]; link this policy from [existing documentation entry point].
 
-For post-merge cleanup, use one bounded worker on a lightweight compatible native
+For terminal-task cleanup, use one bounded worker on a lightweight compatible native
 model, selected from the current host without hard-coded model names. Follow the
 cleanup profile in `.codex/delegation-brief.md`: one Python helper invocation, a
 compact result, no code review, project test reruns, polling or silent upgrade to
 an expensive worker. Preserve coordinator settings, authentication and permissions.
-Cleanup defaults ON with opt-out; confirm all associated PRs merged, delete and
-verify remote branches first, then remove the exact worktree without force.
+Apply `[SUPERSEDED]` through `supersede` with a verified successor; it closes the
+predecessor PR and records replacement ownership. Both cleanup options default ON:
+remote branches after merged/closed PRs, worktrees after merge/recorded supersession.
+Honor independent opt-outs and the legacy master switch; keep local branch refs.
+Verify eligible remote deletion first when enabled. For managed worktrees, follow
+`native_action` through the native owner, then run `cleanup` from outside the target
+to confirm removal. Queued archival and blocked cleanup remain pending with a
+precise action. Preserve dirty/shared/active resources and ambiguous ownership.
 
 Use authorized native subagents when native execution is selected and independent
 work, specialization or context isolation justifies coordination. Before spawning,

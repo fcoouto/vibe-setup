@@ -3,3 +3,5 @@ schema_version = 1
 [task_lifecycle]
 enabled = true
 auto_cleanup = true
+delete_remote_branches = true
+delete_worktrees = true

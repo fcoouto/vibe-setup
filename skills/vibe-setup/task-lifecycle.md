@@ -211,43 +211,109 @@ latest text, preserves human content and verifies exact readback, but a concurre
 edit between read and write remains a race. Reconcile observed conflicts manually.
 The helper is cooperative automation, not an interceptor for arbitrary tools.
 
-## Inexpensive cleanup after merge
+## Supersede a predecessor
 
-Cleanup defaults ON. Trigger once when synchronization first observes all merges,
-including after the user reports a merge; do not poll or start a recurring task.
-Use the [lightweight cleanup worker](delegation-brief.md#lightweight-cleanup-worker)
-profile: one simpler compatible native model, three minutes and one attempt,
-compact result, no project tests/builds or code review. Python performs the checks.
-No fixed model name, new billing/provider path or silent expensive fallback.
+Use `supersede` from the source checkout, outside the predecessor worktree. The
+command records a replacement, replaces `[READY]`/`[BLOCKED]` with `[SUPERSEDED]`,
+and closes every owned predecessor PR. It preserves human title text and body
+content outside the managed section. The replacement remains untouched.
 
-Run from outside the target worktree, with a fresh report that all writers stopped
-and the task exclusively owns it. Explicitly registered branches plus paginated
-PR lookup must establish the complete, nonempty inventory. Every associated PR
-must be observed merged and owned by this task; missing/inaccessible/ambiguous
-history blocks deletion. Historical worktrees without that inventory need manual
-reconciliation and are never enrolled through a broad sweep.
+```sh
+python3 -B /path/to/vibe-setup/workflow.py supersede /absolute/source < supersede.json
+```
 
-The helper preserves dirty, untracked and ignored files, extra commits, active or
-unknown writers, shared/pinned/foreign/primary worktrees, and default/protected/
-shared/advanced/recreated branches. Native managed worktrees require the host's
-lifecycle action; the helper returns a manual step rather than removing them.
-Host ownership is reported by the coordinator; Git facts are checked directly.
+```json
+{
+  "task_id": "PREDECESSOR_TASK_UUID",
+  "successor": "https://github.com/OWNER/REPOSITORY/pull/123",
+  "usage": {"kind": "managed", "scope": "exclusive", "writers": []}
+}
+```
 
-For eligible Git worktrees it deletes each remote branch with an expected-head
-lease, verifies every branch absent, then uses non-force Git worktree removal.
-It retains local branch refs. Remote deletion never follows local removal.
-Partial progress is durable outside the removed folder. Resume from the source
-with the same event ID and fresh usage; a recreated branch is preserved even when
-its commit matches the old one. A completed receipt reports historical completion
-without starting another worker merely to recheck unchanged state.
+`successor` is either a same-repository active/merged PR URL or the UUID of a
+separate verified task with an existing worktree in the same repository. A task
+cannot replace itself; an already superseded or closed-unmerged replacement is
+rejected. Supersede each predecessor task separately: ownership bindings remain
+immutable, and this command never enrolls arbitrary historical branches.
 
-`cleanup=pending` is separate from `delivery=merged`. On failure, preserve remaining
-resources, name the exact action and stop. Retry after new evidence or the action.
-If manual cleanup is needed, verify the full PR inventory and ownership, remove
-only eligible remote branches, confirm absence, then remove the clean worktree
-through its owning Git/native host. Never substitute recursive or forced removal.
-Local/ref checks reduce races but cannot prevent unrelated processes from writing;
-stop writers first and retain ambiguous resources.
+For a verified task that has never published through this helper, also provide
+`publication` with the same fields as `sync`, naming exactly its owned branch.
+The helper verifies that no PR exists before recording an unpublished
+supersession. It does not create an empty PR. A remote branch without a closed PR
+is retained; the superseded worktree is eligible for removal. The local branch
+must still retain its exact recorded head, including unpublished commits.
+
+The intent is saved before changing GitHub. Retry the same request after an
+interruption; the replacement cannot silently change. `cleanup` also resumes an
+existing intent. A completed supersession that was subsequently reopened or
+edited requires reconciliation; the helper never closes it again automatically.
+An externally edited title alone is not a recorded supersession and does not
+permit worktree removal. Missing replacement or ownership evidence stays pending.
+
+## Inexpensive terminal-task cleanup
+
+Both cleanup options default ON. On observing a merge, closure or supersession,
+run reconciliation once, including after a user reports that transition. Do not
+poll or create a recurring task. `sync` and `resume` reconcile terminal PRs;
+`cleanup` needs only the task identity and fresh usage, without old build/review
+logs or a delivered publication event:
+
+```sh
+python3 -B /path/to/vibe-setup/workflow.py cleanup /absolute/source < cleanup.json
+```
+
+```json
+{
+  "task_id": "TASK_UUID",
+  "usage": {"kind": "git", "scope": "exclusive", "writers": []}
+}
+```
+
+| Observed task state | Remote branches | Worktree |
+| --- | --- | --- |
+| Every associated PR merged | Delete eligible branches | Remove |
+| All PRs closed, with some unmerged | Delete eligible branches | Retain |
+| Recorded supersession, predecessor PRs closed | Delete eligible branches | Remove |
+| Recorded unpublished supersession | Retain any remote branch | Remove |
+| Any associated PR open, missing or ambiguously owned | Preserve | Preserve |
+
+Each column obeys its own opt-out. Local branch refs are always retained as the
+recovery copy, including closed-unmerged and unpublished work. Worktree removal
+requires an exact retained head and a clean worktree, including ignored files.
+Extra commits, running/unknown writers, shared/pinned/foreign/primary worktrees,
+locks and unknown ownership block cleanup. Default, protected, shared, advanced
+or recreated remote branches are preserved. Remote protection does not prevent
+local removal when remote deletion is explicitly disabled.
+
+Use the [bounded cleanup profile](delegation-brief.md#lightweight-cleanup-worker).
+Python verifies facts. Supply fresh ownership/writer information and stop writers.
+If both actions are enabled, delete remote branches with expected-head leases and
+verify absence before removing the worktree. If remote deletion is opted out,
+worktree removal may proceed independently. Never substitute forced or recursive
+removal. Historical resources without usable task/PR records require scoped
+manual reconciliation; no broad sweep is authorized.
+
+For a native managed worktree, Python performs eligible remote cleanup and
+returns `native_action` naming `archive_worktree`, the exact worktree, task and
+head. The coordinator resolves that worktree's attachment in its owning chat,
+uses the native archive tool, then invokes `cleanup` again from the source with
+fresh usage. A queued archive remains `cleanup=pending`; only absent filesystem
+path AND absent Git registration confirm removal. The helper never invokes a
+native client tool or removes a managed checkout through Git. Dirty, primary,
+pinned or shared resources must not be archived to bypass a helper rejection.
+
+Pending reasons, native-removal intent and per-resource outcomes are durable in
+the Git common directory. Resume on new evidence or after the named action, not
+by repeating expensive checks or workers. `cleanup=complete` means the currently
+eligible, enabled actions finished; inspect `cleanup_checks` for retained resources.
+A closed-unmerged task can therefore complete remote cleanup while retaining its
+worktree. A receipt with both resources removed remains historical evidence.
+Unexpected external disappearance without recorded removal intent stays pending.
+Recreated branches and changed inventories are never silently deleted again.
+
+Local/ref checks reduce races but cannot prevent unrelated processes from writing.
+GitHub metadata has no compare-and-swap guarantee. Preserve ambiguous outcomes,
+keep the next action concrete, and separate delivery from cleanup in reports.
 
 ## Explicit opt-out
 
@@ -260,11 +326,20 @@ schema_version = 1
 [task_lifecycle]
 enabled = true
 auto_cleanup = true
+delete_remote_branches = true
+delete_worktrees = true
 ```
 
-Set `auto_cleanup=false` to keep remote branches and the worktree after merge.
-Both the source and task-worktree preference are checked; either opt-out prevents
-deletion. Preserve that choice through setup, upgrades and resume.
+`delete_remote_branches=false` retains remote branches after merged/closed PRs.
+`delete_worktrees=false` retains worktrees after merge or recorded supersession.
+These options are independent. Missing options mean true; values must be booleans.
+
+Existing `auto_cleanup=false` remains a master opt-out for both actions, even if
+individual options are true. `enabled=false` disables the entire lifecycle,
+including supersession. Superseding still closes predecessor PRs when only
+cleanup is disabled. Both source and task-worktree policies are checked: either
+opt-out wins for that resource. The worktree policy is saved before removal so
+its opt-outs survive absence. Preserve choices through setup, upgrades and resume.
 
 Preserve an explicit `enabled=false` in the selected source checkout. Startup
 then reports `implementation=disabled` and creates no worktree or task state.
