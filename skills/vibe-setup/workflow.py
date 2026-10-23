@@ -771,7 +771,44 @@ def validate_evidence(entry: dict) -> None:
         raise ValueError("Local validation evidence is missing or changed")
 
 
-def validate_security(security: dict, snapshot: str) -> None:
+def validate_security_coverage(entry: dict, snapshot: str, files: list[str]) -> None:
+    path = Path(entry["path"])
+    safe_file(path)
+    with path.open("rb") as handle:
+        payload = handle.read(65537)
+    if len(payload) > 65536 or hashlib.sha256(payload).hexdigest() != entry["sha256"]:
+        raise ValueError("Security coverage must be unchanged and at most 64 KiB")
+    try:
+        record = json.loads(payload, object_pairs_hook=unique_object)
+    except (ValueError, UnicodeError, RecursionError) as error:
+        raise ValueError("Provide a valid security coverage JSON record") from error
+    if (not isinstance(record, dict) or set(record) != {"schema_version", "snapshot", "files", "areas"}
+            or type(record["schema_version"]) is not int or record["schema_version"] != 1
+            or record["snapshot"] != snapshot):
+        raise ValueError("Security coverage must bind the current assessment snapshot")
+    scope = record["files"]
+    if (not isinstance(scope, list) or not scope or not all(isinstance(name, str) for name in scope)
+            or len(set(scope)) != len(scope) or sorted(scope) != sorted(files)):
+        raise ValueError("Security coverage must account for every declared file")
+    areas = record["areas"]
+    if (not isinstance(areas, dict)
+            or set(areas) != {"scope", "methods", "history", "callers", "tests", "adversarial", "execution"}):
+        raise ValueError("Record all required security coverage areas")
+    for name, area in areas.items():
+        if (not isinstance(area, dict) or set(area) != {"status", "summary", "evidence"}
+                or area["status"] not in ("covered", "not_applicable")
+                or (area["status"] == "not_applicable" and name not in ("history", "callers"))
+                or not isinstance(area["summary"], str) or not area["summary"].strip()
+                or len(area["summary"]) > 8192 or "\0" in area["summary"]
+                or not isinstance(area["evidence"], list) or not 1 <= len(area["evidence"]) <= 32):
+            raise ValueError("Each coverage area needs a bounded rationale and supporting evidence")
+        for proof in area["evidence"]:
+            validate_evidence(proof)
+            if proof["outcome"] != "passed" or proof["path"] == entry["path"]:
+                raise ValueError("Coverage needs passing evidence outside the coverage record itself")
+
+
+def validate_security(security: dict, snapshot: str, files: list[str]) -> None:
     fields = {"snapshot", "risk", "rationale", "status", "required_checks", "checks"}
     if not isinstance(security, dict) or set(security) != fields:
         raise ValueError("Provide the complete security assessment and required evidence")
@@ -790,7 +827,7 @@ def validate_security(security: dict, snapshot: str) -> None:
         raise ValueError("Declare unique required security check names")
     minimum = {"impact-review", "trailofbits-update-review"}
     if security["risk"] in ("R1", "R2"):
-        minimum.add("security-validation")
+        minimum.update(("security-validation", "security-coverage"))
     if security["risk"] == "R2":
         minimum.add("independent-security-review")
     if not minimum <= set(required) or not isinstance(security["checks"], list):
@@ -800,6 +837,8 @@ def validate_security(security: dict, snapshot: str) -> None:
         validate_evidence(entry)
         if entry["outcome"] != "passed":
             raise ValueError("Every required security check must pass before readiness or release")
+        if entry["name"] == "security-coverage":
+            validate_security_coverage(entry, snapshot, files)
         names.append(entry["name"])
     if len(set(names)) != len(names) or set(names) != set(required):
         raise ValueError("Supply exactly one passing evidence entry for every required security check")
@@ -818,7 +857,7 @@ def check_security(root: Path, request: dict) -> dict:
     if snapshot["digest"] != request["snapshot"]:
         raise ValueError("Release snapshot is stale; inspect and validate the release revision again")
     require_clean_security_checkout(root)
-    validate_security(request["security"], snapshot["digest"])
+    validate_security(request["security"], snapshot["digest"], request["files"])
     return result("check-security", "ok", "validation_only", security="passed",
                   risk=request["security"]["risk"], snapshot=snapshot["digest"], head=snapshot["head"],
                   next_action="Security evidence passed for this revision; apply remaining release requirements and authorization")
@@ -880,7 +919,7 @@ def validate_event(request: dict) -> None:
             entry["outcome"] != "passed" for entry in [*validation["checks"], validation["review"]])):
         raise ValueError("Current local checks and independent review must pass before readiness")
     if request["kind"] == "ready":
-        validate_security(validation.get("security"), request["snapshot"])
+        validate_security(validation.get("security"), request["snapshot"], request["files"])
 
 
 def lifecycle_path(binding: dict) -> Path:
@@ -1335,7 +1374,7 @@ def sync_event(request: dict, task: dict) -> dict:
             else:
                 pr = update_metadata(state, event, pr, "BLOCKED")
                 if request["kind"] == "ready":
-                    validate_security(request["validation"].get("security"), request["snapshot"])
+                    validate_security(request["validation"].get("security"), request["snapshot"], request["files"])
                     if pr.get("draft"):
                         query = "mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{isDraft}}}"
                         try:
@@ -1347,7 +1386,7 @@ def sync_event(request: dict, task: dict) -> dict:
                         raise RemoteFailure("readiness", "Remote checks, reviews or mergeability are not ready; retain [BLOCKED]")
             if request["kind"] == "ready":
                 try:
-                    validate_security(request["validation"].get("security"), request["snapshot"])
+                    validate_security(request["validation"].get("security"), request["snapshot"], request["files"])
                     prepare_commit(state, event, task)
                     require_clean_security_checkout(root)
                 except (ValueError, OSError):
@@ -1425,7 +1464,7 @@ def resume_lifecycle(root: Path, operation_id: str, confirmation: dict | None = 
             return {**response, "operation": "resume"}
         if (response["status"] == "action_required" and request["kind"] == "ready"
                 and response.get("failure_step") in ("access", "unknown", "remote", "actor", "identity", "create_unknown")):
-            validate_security(request["validation"].get("security"), request["snapshot"])
+            validate_security(request["validation"].get("security"), request["snapshot"], request["files"])
             target = Path(task["worktree"])
             require_clean_security_checkout(target)
             if (any(fingerprint(target / name) != value for name, value in event["snapshot"]["files"].items())

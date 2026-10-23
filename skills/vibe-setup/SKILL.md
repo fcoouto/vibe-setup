@@ -25,7 +25,10 @@ Use only the three [review triggers](security-validation.md#review-triggers):
 implementation-complete/READY/production candidate, release/deployment, or an
 explicit user/project requirement. Within each gate, check Trail of Bits updates,
 review relevant changes before adoption, and record `trailofbits-update-review`
-evidence. Reuse applicable evidence and rerun only invalidated checks. Draft edits,
+evidence. R1/R2 also require the structured `security-coverage` record, including
+history, quantified callers, method mapping and execution limits. Independent
+review verifies substantive coverage; helper validation alone cannot. Reuse
+applicable evidence and rerun only invalidated checks. Draft edits,
 scope changes and worktree creation do not independently trigger audits.
 
 Delegation follows Vibe's [policy and execution contract](delegation-brief.md).

@@ -17,7 +17,7 @@ Uncertainty takes the higher plausible risk until investigation resolves it.
 | Risk | Scope | Required evidence names |
 | --- | --- | --- |
 | R0 | No executable, configuration, dependency, data-handling or trust-boundary impact; for example a verified cosmetic edit. | `impact-review`: explain the inspected scope and why deeper checks do not apply; `trailofbits-update-review`: the upstream check and applicability decision described below. |
-| R1 | Ordinary behavior changes or refactors without a sensitive boundary change. | R0 checks plus `security-validation`: focused diff/caller review and relevant negative or regression cases. |
+| R1 | Ordinary behavior changes or refactors without a sensitive boundary change. | R0 checks plus `security-validation` and `security-coverage`: focused diff/caller review, relevant negative or regression cases, and the structured coverage record below. |
 | R2 | Auth, permissions, secrets, privacy, untrusted input, crypto, execution, security controls, destructive data effects, or comparable exposure. | R1 checks plus `independent-security-review` by a separate qualified reviewer. Include adversarial cases for the affected boundary. |
 
 UI can introduce XSS; logging can disclose secrets; agent instructions and
@@ -162,6 +162,84 @@ Respect tool coverage and result semantics:
   `variant-analysis` needs a known root cause; `fp-check` verifies findings rather
   than replacing discovery. Do not run these full workflows for every edit.
 
+## Required coverage record
+
+For R1 and R2, include `security-coverage` in both `required_checks` and `checks`.
+Its fingerprinted file must be a UTF-8 JSON record with exactly `schema_version`
+(integer `1`), `snapshot` (the assessment digest), `files` (every declared
+publication/release path, without duplicates), and `areas`. Old R1/R2 records
+without this entry cannot authorize a new READY or release. R0 keeps its existing
+impact/update requirements; do not classify executable instructions as R0 to avoid
+coverage. Draft, blocker and withdrawal events remain available.
+
+`areas` must contain exactly the seven names below. Each value has exactly
+`status`, `summary` and `evidence`. Status is `covered`; only `history` and
+`callers` may use `not_applicable`, supported by evidence of the inspected scope.
+Missing tools, unexamined paths and unavailable history are incomplete coverage,
+not non-applicability. A new entrypoint can lack prior history, but its callers,
+configuration, invocation and trust boundaries still need examination.
+
+| Area | Required review and retained evidence |
+| --- | --- |
+| `scope` | Exact base/head or working snapshot, all changed files, connected code, risk, trust boundaries and explicit exclusions. Explain content-equivalent reuse after commit/merge; a refreshed digest alone is insufficient. |
+| `methods` | Each selected upstream method and immutable revision; installed upstream execution or native adaptation; map applicable method steps to concrete evidence. Explain exclusions and gaps. Do not label an adaptation fully equivalent when relevant upstream steps are missing. |
+| `history` | Baseline blame/log for removed or weakened protections and pertinent introducing/fix commits. Check reintroduced code against prior fixes. Record commands, inspected ranges, conclusions and limits; current diff inspection alone is insufficient. |
+| `callers` | Enumerate affected symbols or instruction entrypoints and their direct caller identities/counts. Trace relevant transitive, CLI, configuration and dynamic invocation paths. Separate production/test callers and same-named functions in different modules. Record search scope, exclusions and unresolved dynamic reach. A count alone is not analysis. |
+| `tests` | Map changed behavior and security boundaries to concrete positive/negative cases and observed results. Preserve failing-before/passing-after proof for defects, skipped/failed coverage and its disposition. Reused logs retain original source/environment bindings. |
+| `adversarial` | Concrete attacker or mistaken-caller goal, preconditions, steps, impact, defended boundary and corresponding test/review evidence. Include races and partial failures when relevant. |
+| `execution` | State precisely which claims are static review, deterministic fixtures, instruction scenarios, installation, discovery or actual-client execution. Required runtime claims need an observed client/session/version and actual tool outcomes; a fixture cannot substitute. Record limits, supported reuse and pending client actions. |
+
+Each summary is nonempty text of at most 8192 characters without NUL. Each area
+references 1–32 supporting evidence entries using the existing exact
+`name`, `outcome`, `path`, `sha256` shape. Outcomes must be `passed` and fingerprints
+must match canonical local files. The coverage record cannot reference itself.
+A shared detailed report can support several areas when it actually covers each;
+seven aliases to an assertion such as “reviewed” are not substantive evidence.
+Keep reports and source excerpts private, outside tracked files.
+
+The record is limited to 64 KiB. For example, this complete structure uses a
+shared detailed report; replace all illustrative values with observed evidence:
+
+```json
+{
+  "schema_version": 1,
+  "snapshot": "<current assessment digest>",
+  "files": ["src/guard.py", "tests/test_guard.py"],
+  "areas": {
+    "scope": {"status": "covered", "summary": "Exact base/head, files and trust boundaries: report section 1.", "evidence": [{"name": "scope", "outcome": "passed", "path": "/private/security-review.json", "sha256": "<report SHA-256>"}]},
+    "methods": {"status": "covered", "summary": "Pinned method-step mapping and native adaptation limits: section 2.", "evidence": [{"name": "methods", "outcome": "passed", "path": "/private/security-review.json", "sha256": "<report SHA-256>"}]},
+    "history": {"status": "covered", "summary": "Baseline blame and prior fix comparison: section 3.", "evidence": [{"name": "history", "outcome": "passed", "path": "/private/security-review.json", "sha256": "<report SHA-256>"}]},
+    "callers": {"status": "covered", "summary": "Named callers, counts and transitive reach: section 4.", "evidence": [{"name": "callers", "outcome": "passed", "path": "/private/security-review.json", "sha256": "<report SHA-256>"}]},
+    "tests": {"status": "covered", "summary": "Boundary cases, commands, outcomes and regression proof: section 5.", "evidence": [{"name": "tests", "outcome": "passed", "path": "/private/security-review.json", "sha256": "<report SHA-256>"}]},
+    "adversarial": {"status": "covered", "summary": "Attack preconditions, steps and defended outcomes: section 6.", "evidence": [{"name": "adversarial", "outcome": "passed", "path": "/private/security-review.json", "sha256": "<report SHA-256>"}]},
+    "execution": {"status": "covered", "summary": "Observed execution layers, required runtime claims and limits: section 7.", "evidence": [{"name": "execution", "outcome": "passed", "path": "/private/security-review.json", "sha256": "<report SHA-256>"}]}
+  }
+}
+```
+
+The helper checks this structure, scope/snapshot binding and every nested
+fingerprint again at existing readiness/recovery gates. It cannot establish the
+truth of summaries, exhaustive caller discovery or reviewer competence. The
+coordinator verifies the source material; the independent R2 reviewer checks all
+seven areas, method equivalence, exclusions and reuse against the actual diff.
+A valid JSON record with inadequate substantive coverage must still block.
+No new scanner, model, permission, background audit or trigger is introduced.
+
+### Close historical gaps without rewriting history
+
+Retain original reports, failed checks and immutable lifecycle requests. Add a
+separately dated retrospective report bound to the original base/head and actual
+source hashes. Record newly performed history/caller analysis and negative checks
+as new evidence; never assert they ran at the old gate. Distinguish a historical
+finding later fixed/superseded from a current unresolved defect. Inspect relevant
+fix provenance before reusing the later resolution. Missing old execution logs
+remain unknown; rerun a bounded current client case only when that runtime claim
+is required and authorized. A retrospective report is not a fresh release approval.
+For a new gate, build a current coverage record and use a fresh READY event with
+all existing gates; do not retrofit the old event or silently grant legacy records
+an exemption. Preserve the original snapshot and reports when rebinding proven
+content-equivalent evidence.
+
 ## Evidence and readiness
 
 Stop writers and capture the lifecycle publication snapshot. Store redacted
@@ -201,7 +279,7 @@ Add `security` to the existing event's `validation` object:
 All six fields are required. `status` is `complete` or `incomplete`; only
 `complete` can pass. Check entries use the existing evidence shape and outcomes
 `passed`, `failed`, `not_run`. Each required name needs exactly one entry; declare
-additional project requirements by name. The risk tier sets the minimum names.
+additional project requirements by name. The risk tier sets the minimum names, including `security-coverage` for R1/R2.
 Both `impact-review` and `trailofbits-update-review` are required at every tier;
 requests from older versions without the update-review entry cannot pass.
 Generic checks and independent review still apply. The helper rejects missing,
