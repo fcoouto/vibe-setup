@@ -80,14 +80,10 @@ identity and ancestry from the selected base. Primary, foreign, detached,
 unregistered, nested and conflicting task worktrees are refused. Existing task
 bindings are checked again on every startup; a stale success record is not proof.
 
-The first successful `start` for a task also performs one pass over **all** pending
-cleanup records in the same Git common directory. App and VS Code use this same
-command through their existing task instructions; no additional native hook,
-model turn, polling or timer is needed. This is lifecycle task startup, not an
-arbitrary chat-open, SessionStart, resume or compaction event. Repeating `start`
-for an already verified task does not repeat the pass. Cleanup outcomes appear
-under `pending_cleanup.tasks`; an old task's blocker does not block unrelated
-cleanup or claim that the new task is ready for production.
+`start` never runs cleanup, contacts publication services, or processes other
+retirement handoffs. It only revokes retirement for a task whose checkout is being
+reused, before allowing writers to resume. Pending deletion is processed on
+confirmed merge or recorded supersession, through the closure flow below.
 
 Before writing, require `status=ok` and `implementation=worktree_verified`.
 Use the returned `context.command_cwd` for commands and
@@ -330,7 +326,7 @@ permit worktree removal. Missing replacement or ownership evidence stays pending
 
 ## Inexpensive terminal-task cleanup
 
-Both cleanup options default ON. On observing a merge, closure or supersession,
+Both cleanup options default ON. On confirming all associated PRs merged or a recorded supersession,
 run reconciliation once, including after a user reports that transition. Do not
 poll or create a recurring task. `sync` and `resume` reconcile terminal PRs;
 `cleanup` needs only the task identity and fresh usage, without old build/review
@@ -350,7 +346,7 @@ python3 -B /path/to/vibe-setup/workflow.py cleanup /absolute/source < cleanup.js
 | Observed task state | Remote branches | Worktree |
 | --- | --- | --- |
 | Every associated PR merged | Delete eligible branches | Remove |
-| All PRs closed, with some unmerged | Delete eligible branches | Retain |
+| All PRs closed, with some unmerged and no recorded supersession | Preserve | Preserve |
 | Recorded supersession, predecessor PRs closed | Delete eligible branches | Remove |
 | Recorded unpublished supersession | Retain any remote branch | Remove |
 | Any associated PR open, missing or ambiguously owned | Preserve | Preserve |
@@ -385,8 +381,8 @@ Pending reasons, native-removal intent and per-resource outcomes are durable in
 the Git common directory. Resume on new evidence or after the named action, not
 by repeating expensive checks or workers. `cleanup=complete` means the currently
 eligible, enabled actions finished; inspect `cleanup_checks` for retained resources.
-A closed-unmerged task can therefore complete remote cleanup while retaining its
-worktree. A receipt with both resources removed remains historical evidence.
+A closed-unmerged task without recorded supersession cannot trigger cleanup.
+A receipt with both resources removed remains historical evidence.
 Unexpected external disappearance without recorded removal intent stays pending.
 Recreated branches and changed inventories are never silently deleted again.
 
@@ -438,43 +434,51 @@ new task's authority over another chat's managed worktree. Unit tests cover the
 helper handoff; instruction scenarios and actual-client archival are separate
 evidence, not guarantees for every client/version.
 
-### Deferred cleanup at the next task
+### Queued cleanup on task closure
 
 After terminal-state, ownership, stopped-writer, clean-tree, head and policy checks
 pass, cleanup records `cleanup.deferred = {"kind": "git"|"managed", "state": "ready"}`
-before attempting the enabled removals. This is a retirement handoff: the task
-relinquishes its exclusive worktree until explicitly reused. It is not a cached
-claim that writers are currently idle. Do not restart writers in a retired
-checkout without running `start` again. Starting that task, using its worktree as
-the new task's source, or synchronizing it cancels the handoff before further
-work. A new explicit cleanup with fresh ownership and stopped writers can renew
-it. A supplied running/unknown writer or shared/pinned scope also cancels it.
-Revocation applies even when earlier opt-outs completed cleanup while retaining
-the worktree. If the caller's handoff cannot be read or durably cancelled, startup
-blocks before authorizing writers; only unrelated cleanup failures are isolated.
+before attempting the enabled removals. This existing retirement handoff is the
+`ready-to-be-deleted` marker. It relinquishes exclusive use until explicitly reused;
+it is not a cached claim that writers are currently idle. Do not restart writers
+in a retired checkout without running `start` again. Starting that task, using its
+worktree as the new task's source, or synchronizing it cancels the handoff before
+further work. A new explicit cleanup with fresh ownership and stopped writers can
+renew it. Running/unknown writers or shared/pinned scope cancel it. Revocation
+also applies to completed cleanup that retained a worktree under an opt-out.
+Failure to cancel retirement durably blocks reuse before authorizing writers.
 
-Each new task visits every pending record once, with no one-worktree limit or
-fixed candidate cap. The existing nonblocking lifecycle lock serializes startup
-with cleanup and publication. Contention requires a later normal retry; the
-helper never waits in a loop. Every eligible handoff reruns the ordinary cleanup
-checks, including current opt-outs, terminal PR inventory, exact retained heads,
-remote absence, clean files and locks. The caller's task, source and current
-directory are excluded. One malformed record or failed cleanup leaves a concrete
-pending outcome and does not stop later candidates. A pass is finite, but duration
-depends on the number of pending tasks and bounded Git/GitHub commands.
+`cleanup`, terminal `sync`, delivered-event `resume`, and `supersede` use the same
+closure path. After fresh confirmation of all associated PRs merged or completed
+recorded supersession, that path visits all other pending records in the same Git
+common directory once. Outcomes appear under `pending_cleanup.tasks`, separately
+from the triggering task's own cleanup result. A complete triggering task does not
+mean the whole queue is complete. A stale completion receipt, ordinary PR closure,
+`[SUPERSEDED]` title alone, startup, resume without confirmed closure, and compaction
+do not authorize a queue pass. User reports prompt remote reconciliation rather
+than substituting for it. No hook, timer, polling or extra model run is added.
 
-The pass reads no old build/review logs, runs no security review and dispatches
-no model. Historical pending records without a retirement handoff cannot authorize
-Git removal: run `cleanup` with fresh usage to establish it. Existing native
-`archive_requested` records can be reconciled only after the owner has removed
-both the directory and Git registration.
+The lifecycle lock serializes cooperating calls without waiting in a loop. Each
+eligible ready handoff rechecks current opt-outs, terminal PR ownership, retained
+heads, remote absence, clean files and locks. The triggering task, its source and
+the current working directory are excluded. There is no one-worktree limit or
+fixed candidate cap. A malformed record or blocked candidate leaves a concrete
+pending outcome without stopping other candidates. Blocked resources remain for
+a later confirmed closure or a scoped retry after the named action/new evidence.
+Neither the queue nor its marker grants authority over another Git repository.
 
-Managed ownership survives later callers and cannot be relabeled as Git. A new
-App or VS Code task cannot archive another chat's App-managed worktree through
-the current archive interface. Such folders remain pending for their native
-owner; no private IPC or Git-removal fallback is used. The next startup can
-verify a completed native archive. Installation and common-command tests do not
-prove native event delivery, and this design does not depend on such events.
+The pass reads no old build/review logs and runs no security review. Unmarked
+historical records cannot authorize Git removal: run `cleanup` with fresh usage
+to establish a handoff. Legacy native `archive_requested` records can be reconciled
+only after the owner has removed both the directory and Git registration.
+
+Managed ownership survives later callers and cannot be relabeled as Git. Another
+chat cannot archive the owning chat's App-managed worktree through the current
+archive interface. Existing managed folders remain pending for their native owner,
+which must follow the [native archive preflight](#native-archive-preflight).
+There is no private IPC or Git-removal fallback. A later closure can verify a
+completed native archive. Installation and helper tests do not prove native event
+delivery. If no later closure occurs, pending cleanup does not run by itself.
 
 Local/ref checks reduce races but cannot prevent unrelated processes from writing.
 GitHub metadata has no compare-and-swap guarantee. Preserve ambiguous outcomes,
@@ -495,7 +499,7 @@ delete_remote_branches = true
 delete_worktrees = true
 ```
 
-`delete_remote_branches=false` retains remote branches after merged/closed PRs.
+`delete_remote_branches=false` retains remote branches after confirmed merge or recorded supersession.
 `delete_worktrees=false` retains worktrees after merge or recorded supersession.
 These options are independent. Missing options mean true; values must be booleans.
 

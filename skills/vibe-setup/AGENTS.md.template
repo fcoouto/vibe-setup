@@ -23,8 +23,8 @@ instructions and nested guides; do not replace the whole file mechanically.
 
 For normal tasks, use this helper directly; do not rerun full Vibe onboarding.
 Inspect first. Before implementation, create/adopt and verify a linked worktree
-with `start`, unless lifecycle is explicitly opted out. New task startup processes all eligible pending cleanup records
-in this repository without polling or extra model runs. Reusing a retired task
+with `start`, unless lifecycle is explicitly opted out. Startup never processes
+cleanup. Reusing a retired task
 must go through `start` before any writer resumes; it cancels that task's cleanup
 handoff. App-managed removals remain with their native owner. Use the returned command
 and worker roots for all writes. If verification fails, stop dependent work and
@@ -134,7 +134,9 @@ compact result, no code review, project test reruns, polling or silent upgrade t
 an expensive worker. Preserve coordinator settings, authentication and permissions.
 Apply `[SUPERSEDED]` through `supersede` with a verified successor; it closes the
 predecessor PR and records replacement ownership. Both cleanup options default ON:
-remote branches after merged/closed PRs, worktrees after merge/recorded supersession.
+remote branches and worktrees after confirmed merge or recorded supersession.
+Each closure processes all eligible queued retirement handoffs in that Git
+repository once; inspect `pending_cleanup.tasks` and report blocked candidates.
 Honor independent opt-outs and the legacy master switch; keep local branch refs.
 Verify eligible remote deletion first when enabled. For managed worktrees, follow
 the `native_action.preflight` reference beside the installed helper before archival:
