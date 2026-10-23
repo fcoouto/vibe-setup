@@ -137,7 +137,9 @@ predecessor PR and records replacement ownership. Both cleanup options default O
 remote branches after merged/closed PRs, worktrees after merge/recorded supersession.
 Honor independent opt-outs and the legacy master switch; keep local branch refs.
 Verify eligible remote deletion first when enabled. For managed worktrees, follow
-`native_action` through the native owner, then run `cleanup` from outside the target
+the `native_action.preflight` reference beside the installed helper before archival:
+retire only verified completed task children with inherited attachments, preserving
+running or uncertain children. Use the native owner, then run `cleanup` from outside the target
 to confirm removal. Queued archival and blocked cleanup remain pending with a
 precise action. Preserve dirty/shared/active resources and ambiguous ownership.
 

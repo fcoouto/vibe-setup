@@ -184,7 +184,10 @@ queued archival remain named dependencies with next actions, never completion.
    `auto_cleanup=false` master switch. Keep local branch refs and all ownership,
    dirty-file, writer and branch safeguards. When both actions are enabled, verify
    remote absence before local removal; a remote opt-out permits independent local
-   removal. For `native_action`, use the exact worktree's native owner and run
+   removal. For `native_action`, first follow the
+   [native archive preflight](task-lifecycle.md#native-archive-preflight) to retire
+   only verified completed task children with inherited attachments; preserve
+   running or uncertain children. Use the exact worktree's native owner and run
    `cleanup` again from the source; queued archival stays pending until filesystem
    and Git registration absence are verified. Persist/report each pending outcome
    and precise next action. No polling, build/review reruns or silent expensive
