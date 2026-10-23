@@ -618,9 +618,10 @@ An independent reader's `.codex-delegations/parser_review.json` for native
 
 ## Lightweight cleanup worker
 
-Deferred cleanup at new-task `start` runs directly in Python over every eligible
-pending retirement handoff. Do not spawn a worker, model turn, timer or poll for
-that pass. Unsupported managed removals remain pending for their native owner.
+After confirmed merge or recorded supersession, queued cleanup runs directly in
+Python over every eligible pending retirement handoff in the same Git repository.
+Startup never runs cleanup. Do not spawn a worker, model turn, timer or poll for
+that queue pass. Unsupported managed removals remain pending for their native owner.
 The profile below applies only when cleanup delegation is separately needed.
 
 Terminal-task cleanup must remain inexpensive. When delegating, use one bounded native worker on a

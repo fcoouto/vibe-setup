@@ -66,11 +66,21 @@ checks, review and non-draft status. Withdraw READY before further edits, preser
 human content, reconcile uncertain results and never auto-merge. Publication
 failure means “blocked; PR update pending”, with a concrete next action.
 
-After all associated PRs are observed merged, cleanup defaults ON. Verify task
-ownership and stopped writers, delete and verify eligible remote branches first,
-then remove the exact clean worktree through its owner without force. Keep local
-branch refs; preserve ambiguous, shared or dirty resources and explicit opt-outs.
-Installation, client discovery and actual execution are separate evidence.
+Cleanup runs only when reconciliation confirms all associated PRs merged or
+records supersession with a verified replacement. Each closure processes all
+eligible queued retirement handoffs in the same Git repository. Startup never
+runs cleanup; `start` only cancels retirement before a checkout is reused.
+Preserve independent `delete_remote_branches=false`, `delete_worktrees=false`,
+`auto_cleanup=false` and whole-lifecycle opt-outs. Closed-unmerged PRs retain their
+remote branches and worktrees unless explicitly superseded. Keep local branch
+refs; preserve active, dirty, shared, foreign or ambiguously owned resources.
+Verify ownership, stopped writers, retained heads and remote absence before local
+removal when enabled. For managed worktrees, follow the installed native archive
+preflight: only verified completed task children with inherited attachments may
+be archived; running or uncertain children remain untouched. Use the native owner
+and verify filesystem and Git registration absence. Queued archival stays pending.
+Inspect `pending_cleanup.tasks` and report each unresolved owner action without
+polling. Installation, client discovery and actual execution are separate evidence.
 
 Every task must follow [proportional security validation](skills/vibe-setup/security-validation.md)
 at implementation-complete/READY/production candidate, release/deployment, or an
