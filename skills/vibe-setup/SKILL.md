@@ -185,6 +185,9 @@ queued archival remain named dependencies with next actions, never completion.
    and Git registration absence are verified. Persist/report each pending outcome
    and precise next action. No polling, build/review reruns or silent expensive
    fallback; installation alone does not prove actual-client cleanup.
+   The next new task's `start` processes all eligible pending retirement handoffs
+   in that repository through Python alone. Reusing a retired checkout must first
+   cancel its handoff through `start`; unsupported managed removals stay pending.
 
 Finish the applicable work; an installer success or a plan alone is insufficient.
 Proven external blockers remain explicit. Do not install machine prerequisites,

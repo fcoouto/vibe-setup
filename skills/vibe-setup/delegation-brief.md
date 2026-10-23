@@ -615,7 +615,12 @@ An independent reader's `.codex-delegations/parser_review.json` for native
 
 ## Lightweight cleanup worker
 
-Terminal-task cleanup must remain inexpensive. Use one bounded native worker on a
+Deferred cleanup at new-task `start` runs directly in Python over every eligible
+pending retirement handoff. Do not spawn a worker, model turn, timer or poll for
+that pass. Unsupported managed removals remain pending for their native owner.
+The profile below applies only when cleanup delegation is separately needed.
+
+Terminal-task cleanup must remain inexpensive. When delegating, use one bounded native worker on a
 lightweight compatible model available in the current authenticated client.
 Choose from the host's supported models and reasoning settings; do not hard-code
 a model family or version. Keep the coordinator's model/settings unchanged. Never

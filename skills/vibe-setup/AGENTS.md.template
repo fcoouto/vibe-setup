@@ -23,7 +23,10 @@ instructions and nested guides; do not replace the whole file mechanically.
 
 For normal tasks, use this helper directly; do not rerun full Vibe onboarding.
 Inspect first. Before implementation, create/adopt and verify a linked worktree
-with `start`, unless lifecycle is explicitly opted out. Use its returned command
+with `start`, unless lifecycle is explicitly opted out. New task startup processes all eligible pending cleanup records
+in this repository without polling or extra model runs. Reusing a retired task
+must go through `start` before any writer resumes; it cancels that task's cleanup
+handoff. App-managed removals remain with their native owner. Use the returned command
 and worker roots for all writes. If verification fails, stop dependent work and
 report the exact manual action; never substitute the primary checkout.
 With lifecycle enabled, preview setup changes with `inspect --task-id`, apply only
