@@ -74,13 +74,13 @@ class RetirementTests(PublicationFixture):
         self.assertFalse(self.target.exists())
         self.assertEqual(self.git(self.source, 'rev-parse', self.request['branch']), self.head)
 
-    def test_closed_unmerged_deletes_remote_but_keeps_worktree_and_local_ref(self):
+    def test_closed_unmerged_preserves_resources_without_cleanup_trigger(self):
         self.publish()
         self.prs[0]['state'] = 'closed'
         result = self.cleanup()
-        self.assertEqual(result['cleanup'], 'complete', result)
+        self.assertEqual(result['cleanup'], 'pending', result)
         self.assertEqual(result['delivery'], 'closed')
-        self.assertFalse(self.remote_exists())
+        self.assertTrue(self.remote_exists())
         self.assertTrue(self.target.exists())
         self.assertEqual(self.git(self.source, 'rev-parse', self.request['branch']), self.head)
 
@@ -104,7 +104,7 @@ class RetirementTests(PublicationFixture):
     def test_title_alone_does_not_authorize_supersession_cleanup(self):
         self.publish()
         self.prs[0].update(title='[SUPERSEDED] Fixture feature', state='closed')
-        self.assertEqual(self.cleanup()['cleanup'], 'complete')
+        self.assertEqual(self.cleanup()['cleanup'], 'pending')
         self.assertTrue(self.target.exists())
 
     def test_managed_cleanup_returns_native_action_then_verifies_removal(self):

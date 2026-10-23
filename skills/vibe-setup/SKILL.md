@@ -177,9 +177,9 @@ queued archival remain named dependencies with next actions, never completion.
    it records intent, preserves human content and closes predecessor PRs. Support
    unpublished predecessors through their explicit publication inventory. Never
    infer supersession from a title alone or discard uncommitted work.
-   When reconciliation observes merge, closure or supersession, follow the bounded
+   When reconciliation observes confirmed merge or recorded supersession, follow the bounded
    cleanup profile in [delegation](delegation-brief.md). Independent options
-   `delete_remote_branches` (merged/closed PRs) and `delete_worktrees`
+   `delete_remote_branches` (merged/superseded PRs) and `delete_worktrees`
    (merged/recorded supersession) default ON. Preserve each opt-out and the legacy
    `auto_cleanup=false` master switch. Keep local branch refs and all ownership,
    dirty-file, writer and branch safeguards. When both actions are enabled, verify
@@ -192,9 +192,10 @@ queued archival remain named dependencies with next actions, never completion.
    and Git registration absence are verified. Persist/report each pending outcome
    and precise next action. No polling, build/review reruns or silent expensive
    fallback; installation alone does not prove actual-client cleanup.
-   The next new task's `start` processes all eligible pending retirement handoffs
-   in that repository through Python alone. Reusing a retired checkout must first
-   cancel its handoff through `start`; unsupported managed removals stay pending.
+   Each confirmed closure processes all eligible queued retirement handoffs in
+   that Git repository through Python alone; inspect `pending_cleanup.tasks` for
+   per-task outcomes. Startup never runs cleanup. Reusing a retired checkout must
+   first cancel its handoff through `start`; unsupported managed removals stay pending.
 
 Finish the applicable work; an installer success or a plan alone is insufficient.
 Proven external blockers remain explicit. Do not install machine prerequisites,

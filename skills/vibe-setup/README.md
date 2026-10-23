@@ -51,11 +51,12 @@ independent default-ON remote-branch and worktree options. Onboarding adds direc
 helper instructions to the existing project guide for normal tasks. The component
 installer API/CLI still installs only the subagent guard.
 
-Each newly verified task startup processes all eligible pending cleanup records
-for that repository through the same helper in App and VS Code. It uses durable
-retirement handoffs and rechecks deletion safety, without polling or model runs.
-Unsupported App-managed removals remain pending for their native owner. See
-[deferred cleanup](task-lifecycle.md#deferred-cleanup-at-the-next-task) for reuse,
+Confirmed merge or recorded supersession processes all eligible queued retirement
+handoffs in that repository through the same helper in App and VS Code. Startup
+never performs cleanup; it only cancels retirement when a checkout is reused.
+Deletion safety is rechecked without polling or model runs. Unsupported App-managed
+removals remain pending for their native owner. See
+[queued cleanup](task-lifecycle.md#queued-cleanup-on-task-closure) for scope, reuse,
 opt-out and legacy-record behavior.
 
 Managed archival includes a [native preflight](task-lifecycle.md#native-archive-preflight)

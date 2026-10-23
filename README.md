@@ -69,8 +69,9 @@ rollback. Its `install.py` installs only the project-local subagent guard.
 The integrated skill uses a small Python helper for [verified worktrees and
 recoverable setup](skills/vibe-setup/onboarding.md), PR publication and default-on
 cleanup with independent opt-outs. Normal tasks invoke the helper through project instructions.
-New task startup processes every eligible pending cleanup in that repository,
-without polling or extra model runs. Unsupported App-managed removals stay pending.
+Confirmed merge or recorded supersession processes every eligible queued retirement
+in that repository. Startup never runs cleanup. No polling or extra model runs are
+added; unsupported App-managed removals stay pending for their native owner.
 App and VS Code qualification remains evidence for the actual client/version/root;
 installation alone never establishes execution.
 

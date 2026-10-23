@@ -361,9 +361,8 @@ def _start_task(source: Path, request: dict) -> dict:
             record["state"] = "verified"
             write_record(record_path, record)
             changes.append("task_bound")
-        pending_cleanup = startup_cleanup(record, newly_verified)
+        cancel_reused_cleanup(record)
         return result("start", "ok", "worktree_verified", changes=changes, context=context,
-                      pending_cleanup=pending_cleanup,
                       evidence_ref=str(record_path), next_action="Use command_cwd and worker_cwd for every task write; reverify after context changes")
 
 
@@ -1258,7 +1257,7 @@ def sync_event(request: dict, task: dict) -> dict:
             if not known <= {pr["number"] for pr in prs}:
                 raise RemoteFailure("inventory", "A previously associated PR is missing; preserve resources")
             if state["cleanup"].get("supersession") or (prs and all(pr.get("state") == "closed" for pr in prs)):
-                return _cleanup_worktree(state, request["usage"])
+                return reconcile_cleanup(state, request["usage"])
             candidates = [pr for pr in prs if pr["head"]["ref"] == binding["branch"]]
             if len(candidates) > 1 or any(pr.get("state") != "open" for pr in candidates):
                 raise RemoteFailure("inventory", "Closed, merged or multiple PR matches require reconciliation")
@@ -1617,7 +1616,7 @@ def supersede_task(root: Path, request: dict) -> dict:
                     "head": facts["head"], "complete": False}
                 state["cleanup"]["state"] = "pending"
                 save_lifecycle(state)
-            return {**_cleanup_worktree(state, request["usage"]), "operation": "supersede"}
+            return {**reconcile_cleanup(state, request["usage"]), "operation": "supersede"}
     except (ValueError, OSError, RemoteFailure) as error:
         return result("supersede", "action_required", "not_ready", cleanup="pending",
                       next_action=str(error) if not isinstance(error, OSError) else "Preserve supersession records and reconcile filesystem access")
@@ -1672,11 +1671,50 @@ def cancel_cleanup_handoff(state: dict) -> None:
         save_lifecycle(state)
 
 
-def startup_cleanup(current: dict, newly_verified: bool) -> dict:
-    """One pass under lifecycle_lock; a handoff relinquishes ownership until reuse."""
+def cancel_reused_cleanup(current: dict) -> None:
+    """Revoke only reused checkouts before writers resume; never run cleanup here."""
+    common = Path(current["common_dir"])
+    callers = [Path(current["source"]), Path(current["worktree"]), Path.cwd().resolve()]
+    for path in canonical(common / "vibe-setup/tasks").glob("*.json"):
+        binding = read_record(path)
+        root = canonical(Path(binding["worktree"]))
+        if binding["task_id"] != current["task_id"] and not any(p.is_relative_to(root) for p in callers):
+            continue
+        lifecycle = lifecycle_path(binding)
+        safe_file(lifecycle)
+        if not lifecycle.exists():
+            continue
+        state = read_lifecycle(lifecycle)
+        if state["binding"] != binding or binding["common_dir"] != str(common):
+            raise ValueError("Reused task ownership changed; reconcile before resuming writers")
+        cancel_cleanup_handoff(state)
+
+
+def reconcile_cleanup(state: dict, usage: dict) -> dict:
+    """Reconcile the owner, then drain eligible handoffs only on a confirmed closure."""
+    outcome = _cleanup_worktree(state, usage)
+    if outcome["delivery"] not in ("merged", "superseded") or outcome["cleanup"] == "disabled":
+        return outcome
+    try:
+        # Historical completion receipts alone must not authorize another task's deletion.
+        publication_access(Path(state["binding"]["source"]), state["publication"])
+        reconcile_supersession(state)
+        prs = terminal_prs(state)
+        supersession = state["cleanup"].get("supersession")
+        if not (prs and all(pr.get("merged_at") for pr in prs)) and not (supersession and supersession["complete"]):
+            return outcome
+        outcome["pending_cleanup"] = queued_cleanup(state["binding"])
+    except (ValueError, OSError, RemoteFailure, KeyError, TypeError, AttributeError, IndexError) as error:
+        message = str(error) if isinstance(error, (ValueError, RemoteFailure)) else "Reconcile closure evidence before processing queued cleanup"
+        outcome["pending_cleanup"] = {"status": "pending", "tasks": [], "next_action": message}
+    return outcome
+
+
+def queued_cleanup(current: dict) -> dict:
+    """One closure pass under lifecycle_lock over relinquished task ownership."""
     common = Path(current["common_dir"])
     outcomes = []
-    response = {"status": "checked" if newly_verified else "not_run", "tasks": outcomes}
+    response = {"status": "checked", "tasks": outcomes}
     directory = canonical(common / "vibe-setup/lifecycle")
     callers = [Path(current["source"]), Path(current["worktree"]), Path.cwd().resolve()]
     enabled = load_cleanup_policy(Path(current["source"])) and load_cleanup_policy(Path(current["worktree"]))
@@ -1695,19 +1733,18 @@ def startup_cleanup(current: dict, newly_verified: bool) -> dict:
                 raise ValueError("Pending cleanup source belongs to another repository")
             cleanup = state["cleanup"]
             if caller:
-                cancel_cleanup_handoff(state)
                 continue
-            if not newly_verified or cleanup.get("state") != "pending":
+            if cleanup.get("state") != "pending":
                 continue
             handoff = cleanup_handoff(state)
             legacy_archive = handoff is None and cleanup.get("local") == "archive_requested"
             if not enabled:
-                reason = "Startup cleanup opted out; resources retained"
+                reason = "Closure cleanup opted out; resources retained"
             elif not legacy_archive and (not handoff or handoff["state"] != "ready"):
                 reason = "No active retirement handoff; run cleanup with fresh ownership and stopped writers"
             elif (legacy_archive or handoff["kind"] == "managed") and (
                     root.exists() or any(entry.get("worktree") == str(root) for entry in worktrees(source))):
-                reason = "Native owner must archive this managed worktree; startup cannot remove it"
+                reason = "Native owner must follow the archive preflight; this queue cannot remove its managed worktree"
             else:
                 # This is a relinquished ownership contract, not a cached live usage report.
                 usage = {"kind": "managed" if legacy_archive else handoff["kind"], "scope": "exclusive", "writers": []}
@@ -1720,8 +1757,6 @@ def startup_cleanup(current: dict, newly_verified: bool) -> dict:
                 save_lifecycle(state)
             outcomes.append({"task_id": binding["task_id"], "cleanup": "pending", "next_action": reason})
         except (ValueError, OSError, RemoteFailure, KeyError, TypeError, AttributeError, IndexError) as error:
-            if caller:
-                raise ValueError("Cannot durably cancel this task's cleanup handoff; reconcile before resuming writers") from error
             # Bad historical records must neither redirect cleanup nor stop later candidates.
             message = str(error) if isinstance(error, (ValueError, RemoteFailure)) else "Reconcile unusable pending cleanup record"
             outcomes.append({"task_id": path.stem, "cleanup": "pending", "next_action": message})
@@ -1769,7 +1804,9 @@ def _cleanup_worktree(state: dict, usage: dict) -> dict:
         prs = terminal_prs(state)
         all_merged = bool(prs) and all(pr.get("merged_at") for pr in prs)
         delivery = "superseded" if supersession else "merged" if all_merged else "closed"
-        remove_local = options["delete_worktrees"] and (all_merged or bool(supersession))
+        if not all_merged and not supersession:
+            raise ValueError("Cleanup requires confirmed merge or recorded supersession; closed-unmerged resources retained")
+        remove_local = options["delete_worktrees"]
         cleanup_ownership(state, usage)
         if not root.exists():
             if cleanup.get("local") not in ("removing", "archive_requested", "removed") or any(
@@ -1913,7 +1950,7 @@ def cleanup_worktree(task: dict) -> dict:
             state = read_lifecycle(lifecycle_path(binding))
             if state["binding"] != binding:
                 raise ValueError("Lifecycle ownership changed; preserve the worktree")
-            return _cleanup_worktree(state, task["usage"])
+            return reconcile_cleanup(state, task["usage"])
     except (ValueError, OSError, RemoteFailure) as error:
         return result("cleanup", "action_required", "not_ready", cleanup="pending",
                       next_action=str(error) if not isinstance(error, OSError) else "No usable cleanup inventory; preserve resources")
