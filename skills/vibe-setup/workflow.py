@@ -972,6 +972,104 @@ def inventory_prs(publication: dict) -> list[dict]:
     return list(inventory.values())
 
 
+def completion_member(source: Path, task_id: str) -> dict:
+    row = {"source": str(source), "task_id": task_id, "completion": "blocked"}
+    try:
+        binding = task_binding(source, task_id)
+        path = lifecycle_path(binding)
+        if not path.exists():
+            return {**row, "completion": "pending", "reason": "Task has no publication record"}
+        state = read_lifecycle(path)
+        if state["binding"] != binding:
+            raise ValueError("Task and lifecycle bindings disagree")
+        publication = state["publication"]
+        row.update(repository=publication["repository"], host=publication["host"])
+        publication_access(source, publication)
+        prs = inventory_prs(publication)
+        known = {pr["number"]: pr for pr in state["prs"]}
+        if not known and not prs:
+            return {**row, "completion": "pending", "reason": "Task has no published PR"}
+        if (not known or len(known) != len(state["prs"])
+                or set(known) != {pr["number"] for pr in prs}):
+            raise ValueError("Reconcile the complete associated PR inventory with sync")
+        for pr in prs:
+            old = known[pr["number"]]
+            if (old["branch"] != pr["head"]["ref"] or old["head"] != pr["head"]["sha"]
+                    or pr["base"]["ref"] != publication["base"]
+                    or managed_section(pr.get("body") or "", task_id) is None):
+                raise ValueError("PR head, base or task ownership changed; reconcile with sync")
+            if pr.get("state") not in ("open", "closed") or type(pr.get("draft")) is not bool:
+                raise ValueError("PR state is unavailable")
+            if pr.get("merged_at") is not None and (
+                    not isinstance(pr["merged_at"], str) or not pr["merged_at"]
+                    or pr["state"] != "closed" or pr["draft"]):
+                raise ValueError("PR merge observation is inconsistent")
+        current = [pr for pr in prs if pr["head"]["ref"] == binding["branch"]]
+        if len(current) != 1:
+            raise ValueError("Reconcile the task branch's unique PR")
+        retained = git(source, "rev-parse", "--verify", "--quiet",
+                       f"refs/heads/{binding['branch']}^{{commit}}", check=False)
+        if retained.returncode not in (0, 1):
+            raise ValueError("Retained task branch could not be inspected")
+        if retained.returncode == 0 and retained.stdout.strip() != current[0]["head"]["sha"]:
+            raise ValueError("Retained task branch has unpublished commits")
+        target = canonical(Path(binding["worktree"]))
+        if not target.exists() and any(entry.get("branch") == f"refs/heads/{binding['branch']}"
+                                       for entry in worktrees(source)):
+            raise ValueError("Task worktree moved or disappeared; reconcile its binding")
+        if target.exists():
+            facts = verify_worktree(source, target, binding["branch"])
+            if (facts["head"] != current[0]["head"]["sha"]
+                    or git(target, "status", "--porcelain=v1", "--untracked-files=all").stdout):
+                raise ValueError("Task worktree has unpublished changes")
+        # Other tools can write without our lock; never persist a completion claim.
+        if task_binding(source, task_id) != binding or read_lifecycle(path) != state:
+            raise ValueError("Task records changed during inspection; check again")
+        row["prs"] = [pr["number"] for pr in prs]
+        if any(pr["state"] == "closed" and not pr.get("merged_at") for pr in prs):
+            raise ValueError("A required PR was closed without merging")
+        if any(pr["state"] == "open" for pr in prs):
+            return {**row, "completion": "pending", "reason": "Required PRs remain open"}
+        return {**row, "completion": "complete", "reason": "Every required PR was observed merged"}
+    except RemoteFailure:
+        return {**row, "reason": "Remote observation unavailable; retry with existing access"}
+    except ValueError as error:
+        return {**row, "reason": str(error)}
+    except (OSError, KeyError, TypeError, AttributeError, IndexError):
+        return {**row, "reason": "Task record or remote response is unavailable or malformed"}
+
+
+def check_completion(root: Path, request: dict) -> dict:
+    """Observe explicitly linked tasks without publishing, merging or cleanup."""
+    canonical(root)
+    if (not isinstance(request, dict) or set(request) != {"members"}
+            or not isinstance(request["members"], list) or not 1 <= len(request["members"]) <= 32):
+        raise ValueError("Provide 1 to 32 explicit completion members")
+    members, identities = [], set()
+    for member in request["members"]:
+        if (not isinstance(member, dict) or set(member) != {"source", "task_id"}
+                or not isinstance(member["source"], str)):
+            raise ValueError("Each completion member requires source and task_id")
+        source = canonical(Path(member["source"]))
+        task_id = uuid_string(member["task_id"])
+        # Canonical source roots prevent duplicate aliases of the same task.
+        facts = repository(source)
+        if facts["root"] != str(source):
+            raise ValueError("Use each member's exact repository root")
+        identity = (facts["common_dir"], task_id)
+        if identity in identities:
+            raise ValueError("Duplicate completion member")
+        identities.add(identity)
+        members.append((source, task_id))
+    rows = [completion_member(source, task_id) for source, task_id in members]
+    states = {row["completion"] for row in rows}
+    completion = "blocked" if "blocked" in states else "pending" if "pending" in states else "complete"
+    return result("check-completion", {"complete": "ok", "pending": "action_required", "blocked": "blocked"}[completion],
+                  "inspection_only", completion=completion, members=rows,
+                  next_action="All listed tasks are complete at this observation" if completion == "complete" else
+                  "Resolve the listed members through their existing lifecycle operations, then check again")
+
+
 def remote_head(root: Path, publication: dict, branch: str) -> str | None:
     try:
         output = git(root, "ls-remote", "--heads", "--", publication["remote"], f"refs/heads/{branch}").stdout.strip()
@@ -1834,7 +1932,7 @@ def main(argv: list[str] | None = None) -> int:
     update_operations = ("plan-update", "apply-update", "resume-update", "rollback-update", "record-update", "status-update")
     probe_operations = ("prepare-probe", "begin-probe", "record-probe", "status-probe")
     delegation_operations = ("plan-delegation", "report-delegation")
-    parser.add_argument("operation", choices=("inspect", "start", "apply", "sync", "resume", "check-security", "supersede", "cleanup") + update_operations + probe_operations + delegation_operations)
+    parser.add_argument("operation", choices=("inspect", "start", "apply", "sync", "resume", "check-security", "check-completion", "supersede", "cleanup") + update_operations + probe_operations + delegation_operations)
     parser.add_argument("root", type=Path, help="Selected project/source checkout")
     parser.add_argument("--client", action="append", choices=("app", "vscode"), default=[])
     parser.add_argument("--task-id", help="Include a read-only setup plan for a verified task worktree")
@@ -1863,6 +1961,10 @@ def main(argv: list[str] | None = None) -> int:
                           "delegation_policy.py" if args.operation in delegation_operations else "native_qualification.py")
                 handler = runpy.run_path(str(Path(__file__).resolve().parent / module))["handle"]
                 output = handler(args.operation, args.root, request, globals())
+            elif args.operation == "check-completion":
+                if args.client or args.task_id or args.file:
+                    raise ValueError("Completion takes its explicit member list in the JSON request")
+                output = check_completion(args.root, request)
             elif args.operation == "supersede":
                 output = supersede_task(args.root, request)
             elif args.operation == "cleanup":

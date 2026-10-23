@@ -165,6 +165,12 @@ Trusted hooks reject structurally invalid intercepted dispatches and request one
 missing-report correction. They do not sandbox workers, verify report truth or
 prove ownership. Verify actual invocation on each supported client after changes.
 
+For work with required companion PRs across repositories, keep every required
+Vibe task in the existing private task record and run `workflow.py check-completion`
+with that explicit member list before claiming overall completion. Only
+`completion=complete` establishes observed delivery for all listed tasks.
+Keep individual readiness, recovery and cleanup under their existing operations.
+
 Continue authorized work after status questions and around independent blockers.
 Respect pauses, cancellations and finite budgets. Do not claim background work
 without an active process. Use the user's publication policy after checks, review
