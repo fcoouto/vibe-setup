@@ -65,6 +65,39 @@ ancestor Git roots. If a known umbrella harness owns the declarations, add
 `--harness-root /absolute/harness` before `--`. The native cwd must be within that
 explicit root. Do not guess a different declaration root when the record is missing.
 
+For a shared account hook serving both an umbrella and unrelated projects, use
+`--umbrella-root /absolute/umbrella` instead of `--harness-root`. This opt-in applies
+the umbrella declaration root only when the child's resolved native cwd is that
+root or a descendant. Other projects retain their existing cwd-based lookup, even
+if the unrelated umbrella directory is unavailable. The two options are mutually
+exclusive; existing strict `--harness-root` behavior is unchanged.
+
+For example, a non-Git `/workspace/product` may own the active guard and
+`/workspace/product/.codex-delegations/reader.json`, while a worker starts in its
+child repository `/workspace/product/docs`. Configure the reviewed shared wrapper:
+
+```sh
+python3 -B /path/to/native_display.py --codex-home /path/to/codex-home --umbrella-root /workspace/product -- node /path/to/hook.mjs
+```
+
+Use an absolute canonical umbrella path without symlinks or `..`. Confirm that
+this root owns the active guard for the covered workers; the option does not
+discover which guard a client loaded. Every covered child uses the umbrella
+declaration, even if a nearer repository has a declaration with the same task
+name. Missing, invalid or unsafe umbrella declarations leave the event unchanged;
+they never fall back to a child repository. Prefix siblings and symlink paths
+resolving outside the umbrella cannot borrow its declarations. No Git repository
+is required at the umbrella root, and no declarations are copied or searched for
+in ancestor directories. Separately launched child-repository guards require
+their own deliberately scoped integration; do not register an umbrella covering
+workers whose active guard uses a different declaration root.
+
+Package updates leave this integration inert. Adoption requires separately
+updating the reviewed shared adapter and its existing hook command, preserving
+unrelated hooks and client trust. Do not restart or interrupt active workers to
+apply this repair. Verify delivery with a future authorized fresh worker; existing
+Habblaud labels remain subject to the first-observation limitation below.
+
 Review and trust the changed hook through the client's supported interface when
 required. Never write trust hashes. Existing sessions may need a supported refresh
 before new hook definitions run. Replacing the command back with its recorded
