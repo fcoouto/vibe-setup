@@ -122,8 +122,14 @@ inputs for manual publication. Never merge automatically.
 
 ## Synchronize one planned milestone
 
-Use one to four routine checkpoints, or one synchronization per declared phase.
+Use one to four routine checkpoints, or one routine checkpoint per declared phase.
 Keep stable milestone IDs and one event UUID per synchronization, including retries.
+Only `checkpoint` events consume that budget. `ready`, `reopen` and `blocker`
+are acceptance or recovery transitions within an existing milestone. After a
+checkpoint or reopened work, use a fresh `ready` event with current source and
+evidence; no unused milestone is required. Reuse the original event for retries
+with unchanged inputs, and preserve prior requests and the frozen schedule.
+Every READY transition still requires all local, security and remote gates.
 A blocker event records the cause and resumption condition. Stop writable workers
 before taking a snapshot; update the PR before reporting in chat. If publication
 fails, report the blocker with “PR update pending” and the concrete manual action.

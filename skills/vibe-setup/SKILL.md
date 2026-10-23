@@ -154,7 +154,10 @@ queued archival remain named dependencies with next actions, never completion.
    canonical setup/quality documentation and maintenance triggers. Report changes,
    checks, review coverage, limits, pending interventions and next action.
    When lifecycle is enabled, publish under the target's actual authorization and
-   readiness policy using `sync`: no more than four planned unphased checkpoints, or one synchronization per phase.
+   readiness policy using `sync`: no more than four planned unphased checkpoints, or one routine checkpoint per phase.
+   READY, reopen and blocker transitions reuse planned milestones without consuming
+   that budget. Use a fresh READY event for refreshed inputs; preserve old requests
+   and rerun all readiness gates, reusing only applicable evidence.
    Stop writers before snapshotting. Create PRs draft with `[BLOCKED]`, preserve
    human content, and verify remote head/metadata before claiming synchronization.
    Blockers stop implementation: update the PR before chat; if that fails, report

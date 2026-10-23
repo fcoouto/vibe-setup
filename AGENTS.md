@@ -58,8 +58,10 @@ the reviewed component installer and ordinary authorized delivery instead.
 
 Follow the installed lifecycle contract for `sync` and `resume`, under the
 repository's publication authority. Stop writers and supply explicit files plus
-current checks and independent review. Plan at most four checkpoints or one sync
-per phase. PRs start draft `[BLOCKED]`; `[READY]` requires current local/remote
+current checks and independent review. Plan at most four routine checkpoints or
+one per phase. READY, reopen and blocker transitions reuse existing milestones
+without consuming that budget; refreshed inputs require a fresh READY event and
+all readiness gates, preserving prior requests. PRs start draft `[BLOCKED]`; `[READY]` requires current local/remote
 checks, review and non-draft status. Withdraw READY before further edits, preserve
 human content, reconcile uncertain results and never auto-merge. Publication
 failure means “blocked; PR update pending”, with a concrete next action.

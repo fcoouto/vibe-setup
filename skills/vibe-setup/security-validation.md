@@ -219,8 +219,9 @@ put private findings, paths, fingerprints or risk rationale in public fields.
 Checkpoint/blocker/reopen events remain usable with absent or invalid security
 evidence and report security pending. This permits honest progress and READY
 withdrawal, not an exemption. Old READY requests without security evidence fail;
-withdraw READY, retain old records, and use a fresh planned event/milestone with
-current evidence. Do not rewrite an immutable event to retrofit acceptance.
+withdraw READY, retain old records, and use a fresh `ready` event in an existing
+planned milestone with current evidence. Readiness transitions do not consume the
+routine checkpoint budget. Do not rewrite an immutable event to retrofit acceptance.
 Delivered-event `resume` remains cleanup reconciliation, not fresh readiness or
 release validation. No historic receipt is a reusable release approval.
 

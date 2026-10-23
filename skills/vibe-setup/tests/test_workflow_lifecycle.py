@@ -165,6 +165,71 @@ class PublicationFixture(WorkflowFixture):
 
 
 class PublicationTests(PublicationFixture):
+    def test_exhausted_checkpoint_budget_allows_ready_but_not_another_checkpoint(self):
+        checkpoint = self.event("checkpoint")
+        checkpoint["schedule"] = {"mode": "checkpoints", "ids": ["phase-1"]}
+        self.assertEqual(self.sync(checkpoint)["status"], "ok")
+        ready = self.event()
+        ready["schedule"] = copy.deepcopy(checkpoint["schedule"])
+        self.assertEqual(self.sync(ready)["status"], "ok")
+        self.assertEqual(self.prs[0]["title"], "[READY] Fixture feature")
+        duplicate = self.event("checkpoint")
+        duplicate["schedule"] = copy.deepcopy(checkpoint["schedule"])
+        self.assertEqual(self.sync(duplicate)["status"], "blocked")
+        changed_schedule = self.event("checkpoint", "phase-2")
+        self.assertEqual(self.sync(changed_schedule)["status"], "blocked")
+        self.assertEqual(len(self.prs), 1)
+
+    def test_reopened_ready_reuses_milestone_without_rewriting_prior_events(self):
+        first = self.event()
+        self.assertEqual(self.sync(first)["status"], "ok")
+        self.assertEqual(self.sync(self.event("reopen"))["status"], "ok")
+        blocker = self.event("blocker")
+        blocker["blockers"] = "Additional validation requested; rerun readiness when complete."
+        self.assertEqual(self.sync(blocker)["status"], "ok")
+        binding, _ = self.workflow.setup_context(self.task)
+        path = self.workflow.lifecycle_path(binding)
+        before = self.workflow.read_lifecycle(path)
+        refreshed = self.event()
+        self.assertEqual(self.sync(refreshed)["status"], "ok")
+        after = self.workflow.read_lifecycle(path)
+        self.assertEqual(after["schedule"], before["schedule"])
+        for identity, event in before["events"].items():
+            self.assertEqual(after["events"][identity], event)
+        self.assertTrue(after["events"][refreshed["event_id"]]["delivered"])
+        rewritten = {**refreshed, "progress": "Changed immutable request"}
+        self.assertEqual(self.sync(rewritten)["status"], "blocked")
+        self.assertEqual(self.sync(refreshed)["status"], "ok")
+
+    def test_reopened_ready_still_requires_current_local_security_and_remote_gates(self):
+        self.assertEqual(self.sync(self.event())["status"], "ok")
+        self.assertEqual(self.sync(self.event("reopen"))["status"], "ok")
+        for failure in ("missing", "stale", "incomplete", "failing", "checks", "review"):
+            with self.subTest(failure=failure):
+                request = self.event()
+                validation = request["validation"]
+                if failure == "missing":
+                    del validation["security"]
+                elif failure == "stale":
+                    validation["security"]["snapshot"] = "0" * 64
+                elif failure == "incomplete":
+                    validation["security"]["status"] = "incomplete"
+                elif failure == "failing":
+                    validation["security"]["checks"][0]["outcome"] = "failed"
+                elif failure == "checks":
+                    validation["checks"][0]["outcome"] = "failed"
+                else:
+                    validation["review"]["outcome"] = "failed"
+                self.assertEqual(self.sync(request)["status"], "blocked")
+                self.assertTrue(self.prs[0]["title"].startswith("[BLOCKED] "))
+        request = self.event()
+        self.ready["mergeStateStatus"] = "BLOCKED"
+        self.assertEqual(self.sync(request)["delivery"], "pending")
+        self.assertTrue(self.prs[0]["title"].startswith("[BLOCKED] "))
+        self.ready["mergeStateStatus"] = "CLEAN"
+        self.assertEqual(self.sync(request)["status"], "ok")
+        self.assertEqual(self.prs[0]["title"], "[READY] Fixture feature")
+
     def test_commit_push_draft_then_ready_and_idempotent_reconciliation(self):
         request = self.event()
         response = self.sync(request)

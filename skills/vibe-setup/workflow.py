@@ -1135,7 +1135,7 @@ def sync_event(request: dict, task: dict) -> dict:
             if not event:
                 for previous in state["events"].values():
                     old = previous["request"]
-                    if (request["kind"] in ("checkpoint", "ready") and old["kind"] in ("checkpoint", "ready")
+                    if (request["kind"] == "checkpoint" and old["kind"] == "checkpoint"
                             and old["milestone"] == request["milestone"]):
                         raise ValueError("Reuse the existing milestone event rather than creating extra checkpoints")
                 snapshot = publication_snapshot(task, request["files"])

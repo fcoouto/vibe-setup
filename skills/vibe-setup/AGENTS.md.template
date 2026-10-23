@@ -32,8 +32,11 @@ task record is created. For onboarding or upgrades, use the reviewed component
 installer's check/install/check flow in the checkout permitted by existing project
 rules. Preserve the opt-out and use ordinary authorized project delivery.
 
-With lifecycle enabled, plan at most four checkpoints, or one synchronization per
-phase. Stop writers and use `sync` with explicit files and current evidence. PRs start draft `[BLOCKED]`;
+With lifecycle enabled, plan at most four routine checkpoints, or one per phase.
+READY, reopen and blocker transitions do not consume that budget. Use a fresh
+READY event within an existing milestone when inputs change; preserve old requests
+and require all readiness gates. Stop writers and use `sync` with explicit files
+and current evidence. PRs start draft `[BLOCKED]`;
 only `[BLOCKED]` and `[READY]` are valid lifecycle title states. Update the PR before
 reporting a blocker in chat; if unavailable, report “blocked; PR update pending”.
 Verify remote commit and metadata before marking synchronization complete. READY
