@@ -319,7 +319,11 @@ or search other roots to conceal an unidentified active hook.
 The optional shared display wrapper has separate root configuration. For a
 non-Git umbrella whose active guard owns child-worker declarations, explicitly
 configure its [scoped umbrella root](native-display.md#explicit-setup) with
-`--umbrella-root /absolute/umbrella`. Workers outside that root retain cwd lookup;
+`--umbrella-root /absolute/umbrella`. Within that scope, bound native ancestry must
+identify an originating session at the exact configured umbrella. Standalone
+child-repository sessions and workers outside the umbrella retain cwd lookup.
+This explicit mapping must match the actual guard; it does not discover guard
+ownership. Missing or unsafe ancestry leaves covered events unchanged;
 installation does not activate or reconfigure the wrapper. A correct guard root
 alone does not establish correct display delivery.
 

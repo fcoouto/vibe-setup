@@ -1,6 +1,6 @@
 """Native presentation metadata; no Habblaud server or account changes."""
 import copy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import importlib.util
 import json
 import os
@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from uuid import UUID
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / ".codex/hooks/native_display.py"
@@ -43,6 +44,9 @@ class NativeDisplayTests(unittest.TestCase):
         day = datetime.now(timezone.utc).strftime("%Y/%m/%d")
         self.rollout = self.home / "sessions" / day / f"rollout-fixture-{CHILD}.jsonl"
         self.rollout.parent.mkdir(parents=True)
+        self.parent_rollout = self.rollout.with_name(f"rollout-fixture-{PARENT}.jsonl")
+        self.parent_meta = dict(id=PARENT, cwd=str(self.project), source="exec")
+        self.write_parent()
         self.meta = dict(id=CHILD, cwd=str(self.project), source={"subagent": {"thread_spawn": {
             "parent_thread_id": PARENT, "agent_path": "/root/reader", "agent_role": None}}})
         self.write_meta()
@@ -52,6 +56,9 @@ class NativeDisplayTests(unittest.TestCase):
 
     def write_meta(self):
         self.rollout.write_text(json.dumps({"type": "session_meta", "payload": self.meta}) + "\n")
+
+    def write_parent(self):
+        self.parent_rollout.write_text(json.dumps({"type": "session_meta", "payload": self.parent_meta}) + "\n")
 
     def enrich(self, event=None, root=None, umbrella=None):
         return self.adapter.enrich_event(self.event if event is None else event, self.home, root, umbrella)
@@ -186,6 +193,105 @@ class NativeDisplayTests(unittest.TestCase):
             self.write_meta()
             self.assertEqual(self.enrich(umbrella=self.project)["agent_role"], "Builder")
         self.assertEqual(self.enrich(umbrella=self.root / "missing")["agent_role"], "Builder")
+
+    def test_standalone_child_session_keeps_its_own_declaration(self):
+        service = self.project / "service"
+        records = service / ".codex-delegations"
+        records.mkdir(parents=True)
+        local = records / "reader.json"
+        local.write_text(json.dumps(dict(self.brief, role="Scout")))
+        self.event["cwd"] = self.meta["cwd"] = str(service)
+        self.parent_meta["cwd"] = str(service)
+        self.write_meta()
+        self.write_parent()
+        self.assertEqual(self.enrich(umbrella=self.project)["agent_role"], "Scout")
+        local.unlink()
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+
+    def test_umbrella_ownership_follows_bound_nested_native_ancestry(self):
+        ancestor = "33333333-3333-4333-8333-333333333333"
+        service = self.project / "service"
+        service.mkdir()
+        self.event["cwd"] = self.meta["cwd"] = str(service)
+        self.meta["source"]["subagent"]["thread_spawn"]["agent_path"] = "/root/parent/reader"
+        self.parent_meta.update(cwd=str(service), source={"subagent": {"thread_spawn": {
+            "parent_thread_id": ancestor, "agent_path": "/root/parent"}}})
+        self.write_meta()
+        self.write_parent()
+        root_log = self.rollout.with_name(f"rollout-fixture-{ancestor}.jsonl")
+        root_log.write_text(json.dumps({"type": "session_meta", "payload": {
+            "id": ancestor, "cwd": str(self.project), "source": "vscode"}}) + "\n")
+        self.assertEqual(self.enrich(umbrella=self.project)["agent_role"], "Reviewer")
+        self.parent_meta["source"]["subagent"]["thread_spawn"]["agent_path"] = "/root/unrelated"
+        self.write_parent()
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+
+    def test_unknown_or_unsafe_ownership_never_borrows_a_declaration(self):
+        variants = [dict(self.parent_meta, id=CHILD), dict(self.parent_meta, source={}),
+                    dict(self.parent_meta, cwd="relative"),
+                    dict(self.parent_meta, source={"subagent": {"thread_spawn": {
+                        "parent_thread_id": CHILD, "agent_path": "/root/parent"}}})]
+        for meta in variants:
+            self.parent_rollout.write_text(json.dumps({"type": "session_meta", "payload": meta}) + "\n")
+            self.assertEqual(self.enrich(umbrella=self.project), self.event)
+        for raw in (b'{broken', b'x' * (128 * 1024 + 1)):
+            self.parent_rollout.write_bytes(raw)
+            self.assertEqual(self.enrich(umbrella=self.project), self.event)
+        self.parent_rollout.unlink()
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+        outside = self.root / "parent.jsonl"
+        outside.write_text(json.dumps({"type": "session_meta", "payload": self.parent_meta}) + "\n")
+        self.parent_rollout.symlink_to(outside)
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+        self.parent_rollout.unlink()
+        self.write_parent()
+        duplicate = self.parent_rollout.with_name(f"rollout-duplicate-{PARENT}.jsonl")
+        duplicate.write_bytes(self.parent_rollout.read_bytes())
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+
+    def test_old_uuid7_owner_is_found_without_searching_session_contents(self):
+        created = datetime.now(timezone.utc) - timedelta(days=30)
+        parent = str(UUID(int=(int(created.timestamp() * 1000) << 80) | (7 << 76) | (2 << 62) | 1))
+        self.parent_rollout.unlink()
+        self.parent_rollout = self.home / "sessions" / created.strftime("%Y/%m/%d") / f"rollout-old-{parent}.jsonl"
+        self.parent_rollout.parent.mkdir(parents=True)
+        self.parent_meta["id"] = parent
+        self.write_parent()
+        self.event["session_id"] = parent
+        self.meta["source"]["subagent"]["thread_spawn"]["parent_thread_id"] = parent
+        self.write_meta()
+        self.assertEqual(self.enrich(umbrella=self.project)["agent_role"], "Reviewer")
+        self.rollout.with_name(f"rollout-duplicate-{parent}.jsonl").write_bytes(self.parent_rollout.read_bytes())
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+
+    def test_ancestry_cycles_and_depth_limit_leave_event_unchanged(self):
+        identities = [str(UUID(int=i + 100)) for i in range(17)]
+        paths = ["/root" + "/parent" * i for i in range(17)]
+        for i, identity in enumerate(identities):
+            source = "exec" if i == 0 else {"subagent": {"thread_spawn": {
+                "parent_thread_id": identities[i - 1], "agent_path": paths[i]}}}
+            self.rollout.with_name(f"rollout-fixture-{identity}.jsonl").write_text(json.dumps({
+                "type": "session_meta", "payload": dict(id=identity, cwd=str(self.project), source=source)}) + "\n")
+        self.event["session_id"] = identities[-1]
+        self.meta["source"]["subagent"]["thread_spawn"].update(
+            parent_thread_id=identities[-1], agent_path=paths[-1] + "/reader")
+        self.write_meta()
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+        self.event["session_id"] = PARENT
+        self.meta["source"]["subagent"]["thread_spawn"].update(
+            parent_thread_id=PARENT, agent_path="/root/parent/reader")
+        self.parent_meta["source"] = {"subagent": {"thread_spawn": {
+            "parent_thread_id": PARENT, "agent_path": "/root/parent"}}}
+        self.write_meta()
+        self.write_parent()
+        self.assertEqual(self.enrich(umbrella=self.project), self.event)
+
+    def test_unrelated_projects_do_not_require_umbrella_ownership_evidence(self):
+        self.parent_rollout.unlink()
+        with patch.object(self.adapter, "session_root", side_effect=AssertionError("must not read ancestry")):
+            self.assertEqual(self.enrich(umbrella=self.root / "missing")["agent_role"], "Reviewer")
+            self.assertEqual(self.enrich()["agent_role"], "Reviewer")
+            self.assertEqual(self.enrich(root=self.project)["agent_role"], "Reviewer")
 
     def test_symlink_outside_umbrella_cannot_borrow_its_declaration(self):
         outside = self.root / "outside"
