@@ -79,11 +79,14 @@ def worktrees(root: Path) -> list[dict]:
     return records
 
 
+CLEANUP_FLAGS = ("delete_remote_branches", "delete_worktrees")
+
+
 def policy_values(root: Path) -> dict:
     path = Path(root) / ".codex/vibe-workflow.toml"
     safe_file(path)
     if not path.exists():
-        return {"enabled": True, "auto_cleanup": True}
+        return {key: True for key in ("enabled", "auto_cleanup", *CLEANUP_FLAGS)}
     try:
         policy = tomllib.loads(path.read_text())
     except (UnicodeError, tomllib.TOMLDecodeError) as error:
@@ -92,9 +95,9 @@ def policy_values(root: Path) -> dict:
     lifecycle = policy.get("task_lifecycle", {})
     if type(version) is not int or version != 1:
         raise ValueError("Unsupported workflow policy schema_version")
-    if not isinstance(lifecycle, dict) or set(lifecycle) - {"enabled", "auto_cleanup"}:
+    if not isinstance(lifecycle, dict) or set(lifecycle) - {"enabled", "auto_cleanup", *CLEANUP_FLAGS}:
         raise ValueError("Unknown or malformed task_lifecycle policy fields")
-    values = {key: lifecycle.get(key, True) for key in ("enabled", "auto_cleanup")}
+    values = {key: lifecycle.get(key, True) for key in ("enabled", "auto_cleanup", *CLEANUP_FLAGS)}
     if any(type(value) is not bool for value in values.values()):
         raise ValueError("Lifecycle preferences must be true or false")
     return values
@@ -105,7 +108,8 @@ def load_policy(root: Path) -> bool:
 
 
 def load_cleanup_policy(root: Path) -> bool:
-    return all(policy_values(root).values())
+    policy = policy_values(root)
+    return policy["enabled"] and policy["auto_cleanup"] and any(policy[key] for key in CLEANUP_FLAGS)
 
 
 def result(operation: str, status: str, implementation: str, **fields) -> dict:
@@ -660,13 +664,13 @@ def managed_section(body: str, task_id: str) -> str | None:
 
 
 def render_pr(title: str, body: str, task_id: str, state: str, section: str) -> tuple[str, str]:
-    if state not in ("BLOCKED", "READY") or not all(isinstance(value, str) for value in (title, body, section)):
-        raise ValueError("PR state must be BLOCKED or READY with text content")
+    if state not in ("BLOCKED", "READY", "SUPERSEDED") or not all(isinstance(value, str) for value in (title, body, section)):
+        raise ValueError("PR state must be BLOCKED, READY or SUPERSEDED with text content")
     if not title.strip() or not section.strip() or "<!-- vibe-task-lifecycle" in section:
         raise ValueError("Provide a title and an unambiguous managed section")
     inner = managed_section(body, task_id)
-    suffix = re.sub(r"^\[(BLOCKED|READY)\] ", "", title, count=1)
-    if suffix.startswith(("[BLOCKED]", "[READY]")):
+    suffix = re.sub(r"^\[(BLOCKED|READY|SUPERSEDED)\] ", "", title, count=1)
+    if suffix.startswith(("[BLOCKED]", "[READY]", "[SUPERSEDED]")):
         raise ValueError("Reconcile duplicate or malformed lifecycle title prefixes")
     start = f"<!-- vibe-task-lifecycle:begin task={task_id} -->"
     end = "<!-- vibe-task-lifecycle:end -->"
@@ -1149,7 +1153,7 @@ def sync_event(request: dict, task: dict) -> dict:
             known = {pr["number"] for pr in state["prs"]}
             if not known <= {pr["number"] for pr in prs}:
                 raise RemoteFailure("inventory", "A previously associated PR is missing; preserve resources")
-            if prs and all(pr.get("merged_at") for pr in prs):
+            if state["cleanup"].get("supersession") or (prs and all(pr.get("state") == "closed" for pr in prs)):
                 return _cleanup_worktree(state, request["usage"])
             candidates = [pr for pr in prs if pr["head"]["ref"] == binding["branch"]]
             if len(candidates) > 1 or any(pr.get("state") != "open" for pr in candidates):
@@ -1335,16 +1339,33 @@ def resume_lifecycle(root: Path, operation_id: str, confirmation: dict | None = 
                 save_lifecycle(current)
             response = result("resume", "ok", "ready", delivery="user_confirmed", cleanup="unverified",
                               confirmation_source=confirmation["actor"], evidence_ref=str(lifecycle_path(state["binding"])),
-                              next_action="Remote facts remain user-confirmed; automatic cleanup still requires observed merged PRs")
+                              next_action="Remote facts remain user-confirmed; automatic cleanup still requires observed terminal PRs")
     return {**response, "operation": "resume"}
+
+
+def cleanup_ownership(state: dict, usage: dict) -> None:
+    binding = state["binding"]
+    root, source = Path(binding["worktree"]), Path(binding["source"])
+    validate_usage(usage)
+    if usage["scope"] != "exclusive":
+        raise ValueError("Preserve shared/pinned worktrees")
+    branches = set(state["publication"]["branches"])
+    for entry in worktrees(source):
+        if entry.get("worktree") != str(root) and entry.get("branch", "").removeprefix("refs/heads/") in branches:
+            raise ValueError("Another worktree uses an associated branch; preserve shared resources")
+    for path in (Path(binding["common_dir"]) / "vibe-setup/tasks").glob("*.json"):
+        other = read_record(path)
+        if other["task_id"] != binding["task_id"] and (other["worktree"] == str(root) or other["branch"] in branches):
+            raise ValueError("Another task owns this worktree or an associated branch")
+    for branch, head in state["cleanup"].get("heads", {}).items():
+        if git(source, "rev-parse", "--verify", f"refs/heads/{branch}", check=False).stdout.strip() != head:
+            raise ValueError("Retain the exact local branch head before deleting any resource")
 
 
 def cleanup_local_safety(state: dict, usage: dict) -> None:
     binding = state["binding"]
     root, source = Path(binding["worktree"]), Path(binding["source"])
-    validate_usage(usage)
-    if usage["kind"] != "git" or usage["scope"] != "exclusive":
-        raise ValueError("Preserve shared/pinned worktrees; managed worktrees require their native lifecycle")
+    cleanup_ownership(state, usage)
     if Path.cwd().resolve().is_relative_to(root):
         raise ValueError("Move coordinator and command context outside the worktree before cleanup")
     facts = verify_worktree(source, root, binding["branch"])
@@ -1354,94 +1375,265 @@ def cleanup_local_safety(state: dict, usage: dict) -> None:
     if git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignored").stdout:
         raise ValueError("Preserve dirty, untracked or ignored files before cleanup")
     if state["cleanup"].get("heads") and facts["head"] != state["cleanup"]["heads"].get(binding["branch"]):
-        raise ValueError("Local commits extend beyond the confirmed merged PR head")
-    branches = set(state["publication"]["branches"])
-    for entry in entries:
-        if entry.get("worktree") != str(root) and entry.get("branch", "").removeprefix("refs/heads/") in branches:
-            raise ValueError("Another worktree uses an associated branch; preserve shared resources")
-    for path in (Path(binding["common_dir"]) / "vibe-setup/tasks").glob("*.json"):
-        other = read_record(path)
-        if other["task_id"] != binding["task_id"] and (other["worktree"] == str(root) or other["branch"] in branches):
-            raise ValueError("Another task owns this worktree or an associated branch")
+        raise ValueError("Local commits extend beyond the recorded cleanup head")
+
+
+def task_binding(root: Path, task_id: str) -> dict:
+    common = Path(repository(canonical(root))["common_dir"])
+    binding = read_record(common / "vibe-setup/tasks" / f"{uuid_string(task_id)}.json")
+    if binding["common_dir"] != str(common) or binding["state"] != "verified":
+        raise ValueError("Task binding does not belong to the selected repository")
+    return binding
+
+
+def validate_successor(state: dict, successor: str) -> None:
+    binding, publication = state["binding"], state["publication"]
+    if not isinstance(successor, str):
+        raise ValueError("Provide a successor task UUID or same-repository pull request URL")
+    if successor.startswith("https://"):
+        prefix = f"https://{publication['host']}/{publication['repository']}/pull/"
+        if not successor.startswith(prefix) or not re.fullmatch(r"[1-9][0-9]*", successor[len(prefix):]):
+            raise ValueError("Successor must identify a pull request in the same repository")
+        number = int(successor[len(prefix):])
+        if number in {pr["number"] for pr in state["prs"]}:
+            raise ValueError("A task cannot supersede itself")
+        pr = gh_api(publication, f"repos/{publication['repository']}/pulls/{number}")
+        if (pr.get("number") != number or pr.get("head", {}).get("ref") in publication["branches"]
+                or (pr.get("state") != "open" and not pr.get("merged_at"))
+                or (pr.get("title") or "").startswith("[SUPERSEDED]")):
+            raise ValueError("Successor must be a distinct active or merged pull request")
+    else:
+        other = task_binding(Path(binding["source"]), successor)
+        if other["task_id"] == binding["task_id"] or other["branch"] in publication["branches"]:
+            raise ValueError("A task cannot supersede itself or another owner of its branch")
+        verify_worktree(Path(other["source"]), Path(other["worktree"]), other["branch"])
+        if lifecycle_path(other).exists():
+            replacement = read_lifecycle(lifecycle_path(other))
+            if replacement["cleanup"].get("supersession"):
+                raise ValueError("Successor task is already superseded; select its active replacement")
+            if replacement["binding"] != other or any(
+                    replacement["publication"][key] != publication[key] for key in ("host", "repository")):
+                raise ValueError("Successor publication must belong to the same repository and task")
+            prs = inventory_prs(replacement["publication"])
+            if {pr["number"] for pr in prs} != {pr["number"] for pr in replacement["prs"]}:
+                raise ValueError("Reconcile the successor PR inventory before superseding")
+            if any((pr.get("state") != "open" and not pr.get("merged_at"))
+                   or (pr.get("title") or "").startswith("[SUPERSEDED]") for pr in prs):
+                raise ValueError("Successor must be an active or merged task")
+
+
+def reconcile_supersession(state: dict) -> None:
+    intent = state["cleanup"].get("supersession")
+    if not intent:
+        return
+    publication, binding = state["publication"], state["binding"]
+    prs = inventory_prs(publication)
+    if {pr["number"] for pr in prs} != set(map(int, intent["prs"])):
+        raise ValueError("Supersession PR inventory changed; preserve resources")
+    if not intent["complete"]:
+        validate_successor(state, intent["successor"])
+    for pr in prs:
+        saved = intent["prs"][str(pr["number"])]
+        if pr["head"]["sha"] != saved["head"] or pr["head"]["ref"] != saved["branch"]:
+            raise ValueError("Predecessor PR head changed; reconcile before closing or deleting")
+        if pr.get("merged_at"):
+            raise ValueError("Predecessor merged during supersession; reconcile its terminal state")
+        inner = managed_section(pr.get("body") or "", binding["task_id"])
+        if inner not in (saved["before"], saved["after"]):
+            raise ValueError("Predecessor managed content changed; preserve the human edit")
+        if intent["complete"]:
+            if pr.get("state") != "closed" or not pr["title"].startswith("[SUPERSEDED] ") or inner != saved["after"]:
+                raise ValueError("Superseded PR was reopened or edited; reconcile before cleanup")
+            continue
+        title, body = render_pr(pr["title"], pr.get("body") or "", binding["task_id"], "SUPERSEDED", saved["after"].strip())
+        if pr.get("state") not in ("open", "closed"):
+            raise ValueError("Unknown predecessor PR state")
+        if pr["title"] != title or pr.get("body") != body or pr["state"] != "closed":
+            gh_api(publication, f"repos/{publication['repository']}/pulls/{pr['number']}", "PATCH",
+                   {"title": title, "body": body, "state": "closed"})
+        observed = gh_api(publication, f"repos/{publication['repository']}/pulls/{pr['number']}")
+        if (observed.get("state") != "closed" or observed.get("merged_at")
+                or observed.get("title") != title or observed.get("body") != body
+                or observed.get("head", {}).get("sha") != saved["head"]):
+            raise ValueError("Supersession readback changed; reconcile before cleanup")
+        state["sections"][str(pr["number"])] = saved["after"]
+    intent["complete"] = True
+    state["last_ready"] = False
+    save_lifecycle(state)
+
+
+def supersede_task(root: Path, request: dict) -> dict:
+    try:
+        if (not isinstance(request, dict) or not {"task_id", "successor", "usage"} <= request.keys()
+                or set(request) - {"task_id", "successor", "usage", "publication"}):
+            raise ValueError("Provide task_id, successor, fresh usage and publication only for an unpublished task")
+        validate_usage(request["usage"])
+        binding = task_binding(root, request["task_id"])
+        target, source = Path(binding["worktree"]), Path(binding["source"])
+        if not load_policy(source) or (target.exists() and not load_policy(target)):
+            return result("supersede", "ok", "disabled", cleanup="disabled", delivery="disabled")
+        with lifecycle_lock(Path(binding["common_dir"])):
+            path = lifecycle_path(binding)
+            if path.exists():
+                state = read_lifecycle(path)
+                if state["binding"] != binding or "publication" in request:
+                    raise ValueError("Preserve the existing task publication binding")
+            else:
+                publication = request.get("publication")
+                validate_publication(publication)
+                if publication["branches"] != [binding["branch"]]:
+                    raise ValueError("An unpublished task must name exactly its owned branch")
+                state = {"schema_version": 1, "binding": binding, "publication": publication,
+                         "schedule": {"mode": "checkpoints", "ids": ["superseded"]}, "events": {},
+                         "prs": [], "sections": {}, "last_ready": False, "cleanup": {}}
+            intent = state["cleanup"].get("supersession")
+            if intent:
+                if intent["successor"] != request["successor"]:
+                    raise ValueError("Resume the recorded supersession; do not change its replacement")
+            else:
+                validate_successor(state, request["successor"])
+                publication_access(source, state["publication"])
+                prs = inventory_prs(state["publication"])
+                known = {pr["number"]: pr for pr in state["prs"]}
+                if set(known) != {pr["number"] for pr in prs}:
+                    raise ValueError("Reconcile all predecessor PR ownership before superseding")
+                facts = verify_worktree(source, target, binding["branch"])
+                entries = {}
+                for pr in prs:
+                    old = known[pr["number"]]
+                    inner = managed_section(pr.get("body") or "", binding["task_id"])
+                    if (pr.get("merged_at") or inner is None or old["head"] != pr["head"]["sha"]
+                            or old["branch"] != pr["head"]["ref"]
+                            or state["sections"].get(str(pr["number"])) != inner):
+                        raise ValueError("Predecessor ownership, content or head changed; reconcile first")
+                    entries[str(pr["number"])] = {"head": old["head"], "branch": old["branch"], "before": inner,
+                        "after": inner.rstrip() + f"\n\nSuperseded by: {request['successor']}\n"}
+                # The retained local branch is the recovery copy for unmerged commits.
+                state["cleanup"]["supersession"] = {"successor": request["successor"], "prs": entries,
+                    "head": facts["head"], "complete": False}
+                state["cleanup"]["state"] = "pending"
+                save_lifecycle(state)
+            return {**_cleanup_worktree(state, request["usage"]), "operation": "supersede"}
+    except (ValueError, OSError, RemoteFailure) as error:
+        return result("supersede", "action_required", "not_ready", cleanup="pending",
+                      next_action=str(error) if not isinstance(error, OSError) else "Preserve supersession records and reconcile filesystem access")
+
+
+def cleanup_options(state: dict) -> dict:
+    binding = state["binding"]
+    source = policy_values(Path(binding["source"]))
+    root = Path(binding["worktree"])
+    local = policy_values(root) if root.exists() else state["cleanup"].get("worktree_policy", source)
+    return {key: all(p["enabled"] and p["auto_cleanup"] and p.get(key, True) for p in (source, local))
+            for key in CLEANUP_FLAGS}
+
+
+def terminal_prs(state: dict) -> list[dict]:
+    prs = inventory_prs(state["publication"])
+    known = {pr["number"]: pr for pr in state["prs"]}
+    supersession = state["cleanup"].get("supersession")
+    unpublished = supersession and supersession["complete"] and not supersession["prs"]
+    if unpublished:
+        if prs or known:
+            raise ValueError("Previously unpublished task acquired a PR; reconcile ownership")
+    elif not prs or not known or not set(known) <= {pr["number"] for pr in prs}:
+        raise ValueError("Confirm the complete nonempty associated PR inventory before cleanup")
+    for pr in prs:
+        if pr.get("state") != "closed" or (pr.get("merged_at") and pr.get("draft") is not False):
+            raise ValueError("Every associated PR must be observed closed or merged")
+        if managed_section(pr.get("body") or "", state["binding"]["task_id"]) is None:
+            raise ValueError("PR ownership is ambiguous; register/reconcile it before cleanup")
+        old = known.get(pr["number"])
+        if old and (old["branch"] != pr["head"]["ref"] or old["head"] != pr["head"]["sha"]):
+            raise ValueError("An associated PR head changed after publication; reconcile its ownership")
+    return prs
 
 
 def _cleanup_worktree(state: dict, usage: dict) -> dict:
     binding, publication = state["binding"], state["publication"]
     root, source = canonical(Path(binding["worktree"])), canonical(Path(binding["source"]))
-    path = lifecycle_path(binding)
-    merged_count = 0
+    path, cleanup = lifecycle_path(binding), state["cleanup"]
+    delivery = "not_checked"
     try:
         validate_usage(usage)
-        if not load_cleanup_policy(source) or (root.exists() and not load_cleanup_policy(root)):
-            return result("cleanup", "ok", "worktree_verified", cleanup="disabled", delivery="not_checked",
-                          evidence_ref=str(path), next_action="Automatic cleanup opted out; resources retained")
-        if state["cleanup"].get("state") == "complete":
+        if not load_policy(source) or (root.exists() and not load_policy(root)):
+            return result("cleanup", "ok", "disabled", cleanup="disabled", delivery="disabled", evidence_ref=str(path))
+        options = cleanup_options(state)
+        if (cleanup.get("state") == "complete" and cleanup.get("local") == "removed"
+                and set(cleanup.get("deleted", [])) == set(publication["branches"])):
             if root.exists() or any(entry.get("worktree") == str(root) for entry in worktrees(source)):
                 raise ValueError("Removed worktree path or registration reappeared; preserve the new resource")
-            return result("cleanup", "ok", "merged", delivery="merged", cleanup="complete", evidence_ref=str(path),
-                          cleanup_checks=state["cleanup"]["checks"])
+            return result("cleanup", "ok", "merged", delivery=cleanup.get("delivery", "merged"), cleanup="complete",
+                          evidence_ref=str(path), cleanup_checks=cleanup["checks"])
+        if cleanup.get("supersession"):
+            publication_access(source, publication)
+            if not cleanup["supersession"]["complete"]:
+                cleanup_local_safety(state, usage)
+        reconcile_supersession(state)
+        supersession = cleanup.get("supersession")
+        if supersession and supersession["complete"]:
+            delivery = "superseded"
+        if not any(options.values()):
+            return result("cleanup", "ok", "worktree_verified", cleanup="disabled", delivery=delivery,
+                          evidence_ref=str(path), next_action="Automatic cleanup opted out; resources retained")
         repo = publication_access(source, publication)
-        prs = inventory_prs(publication)
-        known = {pr["number"]: pr for pr in state["prs"]}
-        if not prs or not known or not set(known) <= {pr["number"] for pr in prs}:
-            raise ValueError("Confirm the complete nonempty associated PR inventory before cleanup")
-        for pr in prs:
-            if pr.get("state") != "closed" or not pr.get("merged_at") or pr.get("draft") is not False:
-                raise ValueError("Every associated PR must be observed merged and non-draft")
-            if managed_section(pr.get("body") or "", binding["task_id"]) is None:
-                raise ValueError("PR ownership is ambiguous; register/reconcile it before cleanup")
-            old = known.get(pr["number"])
-            if old and (old["branch"] != pr["head"]["ref"] or old["head"] != pr["head"]["sha"]):
-                raise ValueError("An associated PR head changed after publication; reconcile its ownership")
-        merged_count = len(prs)
-        previous = state["cleanup"]
+        prs = terminal_prs(state)
+        all_merged = bool(prs) and all(pr.get("merged_at") for pr in prs)
+        delivery = "superseded" if supersession else "merged" if all_merged else "closed"
+        remove_local = options["delete_worktrees"] and (all_merged or bool(supersession))
+        cleanup_ownership(state, usage)
         if not root.exists():
-            if previous.get("local") != "removing" or any(entry.get("worktree") == str(root) for entry in worktrees(source)):
+            if cleanup.get("local") not in ("removing", "archive_requested", "removed") or any(
+                    entry.get("worktree") == str(root) for entry in worktrees(source)):
                 raise ValueError("Worktree disappeared without confirmed removal intent; reconcile registration")
         else:
             cleanup_local_safety(state, usage)
-        heads = {}
-        observed_remote = {}
+            cleanup["worktree_policy"] = policy_values(root)
+        heads, deletable = {}, []
         for branch in publication["branches"]:
             if branch == repo.get("default_branch"):
                 raise ValueError("Never clean up the remote default branch")
             candidates = {pr["head"]["sha"] for pr in prs if pr["head"]["ref"] == branch}
-            if not candidates:
-                raise ValueError("An associated branch has no confirmed merged PR")
+            if not candidates and supersession and not supersession["prs"] and branch == binding["branch"]:
+                candidates = {supersession["head"]}
+            elif not candidates:
+                raise ValueError("An associated branch has no confirmed closed PR")
             local = git(source, "rev-parse", "--verify", f"refs/heads/{branch}", check=False).stdout.strip()
-            expected = previous.get("heads", {}).get(branch) or (local if local in candidates else None)
+            expected = cleanup.get("heads", {}).get(branch) or (local if local in candidates else None)
             if expected is None and len(candidates) == 1:
                 expected = next(iter(candidates))
-            if expected not in candidates:
-                raise ValueError("Merged branch head is ambiguous; preserve it for manual review")
-            if local and local != expected:
-                raise ValueError("Local branch has commits beyond its confirmed merged head")
+            if expected not in candidates or local != expected:
+                raise ValueError("Retain the exact local branch head before deleting any resource")
             heads[branch] = expected
-            observed_remote[branch] = remote_head(source, publication, branch)
-            if branch in previous.get("deleted", []) and observed_remote[branch] is not None:
+            remote = remote_head(source, publication, branch)
+            if branch in cleanup.get("deleted", []) and remote is not None:
                 raise ValueError("Previously deleted branch was recreated; preserve it")
-            if observed_remote[branch] not in (None, expected):
+            if remote not in (None, expected):
                 raise ValueError("Remote branch advanced or was reused; preserve it")
-            if observed_remote[branch] is not None:
-                info = gh_api(publication, f"repos/{publication['repository']}/branches/{quote(branch, safe='')}")
-                rules = gh_api(publication, f"repos/{publication['repository']}/rules/branches/{quote(branch, safe='')}")
-                if info.get("protected") is not False or not isinstance(rules, list) or rules:
-                    raise ValueError("Protected or rule-governed branches require manual cleanup")
-        if previous.get("heads") and previous["heads"] != heads:
+            if options["delete_remote_branches"] and any(pr["head"]["ref"] == branch for pr in prs):
+                deletable.append(branch)
+                if remote is not None:
+                    info = gh_api(publication, f"repos/{publication['repository']}/branches/{quote(branch, safe='')}")
+                    rules = gh_api(publication, f"repos/{publication['repository']}/rules/branches/{quote(branch, safe='')}")
+                    if info.get("protected") is not False or not isinstance(rules, list) or rules:
+                        raise ValueError("Protected or rule-governed branches require manual cleanup")
+        if cleanup.get("heads") and cleanup["heads"] != heads:
             raise ValueError("Cleanup branch inventory changed; preserve resources")
-        if not previous:
-            state["cleanup"] = {"state": "pending", "heads": heads, "deleted": [], "local": "pending",
-                                "prs": sorted(pr["number"] for pr in prs)}
-            save_lifecycle(state)
-        elif previous["prs"] != sorted(pr["number"] for pr in prs):
+        numbers = sorted(pr["number"] for pr in prs)
+        if "prs" in cleanup and cleanup["prs"] != numbers:
             raise ValueError("Cleanup PR inventory changed after intent; reconcile before deletion")
-        cleanup = state["cleanup"]
+        cleanup.update(state="pending", heads=heads, prs=numbers, delivery=delivery)
+        cleanup.setdefault("deleted", [])
+        cleanup.setdefault("local", "pending")
+        cleanup.pop("last_error", None)
+        save_lifecycle(state)
         if root.exists():
             cleanup_local_safety(state, usage)
-        for branch, expected in heads.items():
-            if not load_cleanup_policy(source) or (root.exists() and not load_cleanup_policy(root)):
-                raise ValueError("Cleanup preference changed; preserve remaining resources")
-            current = remote_head(source, publication, branch)
+        for branch in deletable:
+            if not cleanup_options(state)["delete_remote_branches"]:
+                raise ValueError("Remote cleanup opted out; preserve remaining resources")
+            terminal_prs(state)
+            current, expected = remote_head(source, publication, branch), heads[branch]
             if branch in cleanup["deleted"] and current is not None:
                 raise ValueError("Deleted branch was recreated; preserve it")
             if current not in (None, expected):
@@ -1449,6 +1641,8 @@ def _cleanup_worktree(state: dict, usage: dict) -> dict:
             if current is not None:
                 if root.exists():
                     cleanup_local_safety(state, usage)
+                else:
+                    cleanup_ownership(state, usage)
                 try:
                     git(source, "push", f"--force-with-lease=refs/heads/{branch}:{expected}",
                         publication["remote"], f":refs/heads/{branch}")
@@ -1460,12 +1654,22 @@ def _cleanup_worktree(state: dict, usage: dict) -> dict:
             if branch not in cleanup["deleted"]:
                 cleanup["deleted"].append(branch)
                 save_lifecycle(state)
-        if any(remote_head(source, publication, branch) is not None for branch in heads):
+        if any(remote_head(source, publication, branch) is not None for branch in cleanup["deleted"]):
             raise ValueError("A remote branch reappeared; preserve the worktree")
-        if root.exists():
+        if remove_local and root.exists():
+            terminal_prs(state)
+            reconcile_supersession(state)
             cleanup_local_safety(state, usage)
-            if not load_cleanup_policy(source) or not load_cleanup_policy(root):
-                raise ValueError("Cleanup opted out before local removal; preserve the worktree")
+            if not cleanup_options(state)["delete_worktrees"]:
+                raise ValueError("Worktree cleanup opted out; preserve the worktree")
+            if usage["kind"] == "managed":
+                cleanup["local"] = "archive_requested"
+                cleanup["last_error"] = "Archive this exact worktree through its native owner, then run cleanup again from the source"
+                save_lifecycle(state)
+                return result("cleanup", "action_required", delivery, delivery=delivery, cleanup="pending", evidence_ref=str(path),
+                              native_action={"tool": "archive_worktree", "worktree": str(root),
+                                             "task_id": binding["task_id"], "head": heads[binding["branch"]]},
+                              next_action=cleanup["last_error"])
             cleanup["local"] = "removing"
             save_lifecycle(state)
             try:
@@ -1473,19 +1677,29 @@ def _cleanup_worktree(state: dict, usage: dict) -> dict:
             except ValueError as error:
                 if root.exists() or any(entry.get("worktree") == str(root) for entry in worktrees(source)):
                     raise RemoteFailure("cleanup_local", "Local removal failed; preserve the folder and resume from outside it") from error
-        if root.exists() or any(entry.get("worktree") == str(root) for entry in worktrees(source)):
+        removed = not root.exists() and not any(entry.get("worktree") == str(root) for entry in worktrees(source))
+        if remove_local and not removed:
             raise ValueError("Worktree removal was not confirmed")
-        cleanup.update(state="complete", local="removed", checks={"merged_prs": merged_count,
-                       "branches_absent": len(heads), "worktree_removed": True})
+        cleanup.update(state="complete", local="removed" if removed else "retained", checks={
+            "merged_prs": sum(bool(pr.get("merged_at")) for pr in prs), "closed_prs": len(prs),
+            "branches_absent": len(cleanup["deleted"]), "worktree_removed": removed,
+            "remote_branches": "deleted" if len(cleanup["deleted"]) == len(heads) else "retained",
+            "worktree": "removed" if removed else "retained"})
+        cleanup.pop("last_error", None)
         save_lifecycle(state)
-        return result("cleanup", "ok", "merged", delivery="merged", cleanup="complete", evidence_ref=str(path),
-                      cleanup_checks=cleanup["checks"], next_action="Remote branches and worktree removed; local branch refs retained")
+        return result("cleanup", "ok", delivery, delivery=delivery, cleanup="complete", evidence_ref=str(path),
+                      cleanup_checks=cleanup["checks"], next_action="Eligible resources cleaned; local branch refs retained")
     except (ValueError, OSError, RemoteFailure, KeyError, TypeError, AttributeError, IndexError) as error:
         message = str(error) if not isinstance(error, OSError) else "Cleanup filesystem action interrupted; preserve progress"
         if isinstance(error, (KeyError, TypeError, AttributeError, IndexError)):
             message = "Malformed cleanup record or remote response; preserve resources and reconcile"
-        return result("cleanup", "action_required", "merged" if merged_count else "worktree_verified",
-                      delivery="merged" if merged_count else "not_checked", cleanup="pending", evidence_ref=str(path),
+        cleanup.update(state="pending", last_error=message)
+        try:
+            save_lifecycle(state)
+        except (ValueError, OSError):
+            message += "; could not persist pending cleanup"
+        return result("cleanup", "action_required", delivery if delivery != "not_checked" else "worktree_verified",
+                      delivery=delivery, cleanup="pending", evidence_ref=str(path),
                       pending_user_actions=[{"code": "cleanup", "message": message, "worktree": str(root),
                                              "resume_from": str(source), "task_id": binding["task_id"]}],
                       next_action="Cleanup pending: " + message)
@@ -1527,7 +1741,7 @@ def main(argv: list[str] | None = None) -> int:
     update_operations = ("plan-update", "apply-update", "resume-update", "rollback-update", "record-update", "status-update")
     probe_operations = ("prepare-probe", "begin-probe", "record-probe", "status-probe")
     delegation_operations = ("plan-delegation", "report-delegation")
-    parser.add_argument("operation", choices=("inspect", "start", "apply", "sync", "resume", "check-security") + update_operations + probe_operations + delegation_operations)
+    parser.add_argument("operation", choices=("inspect", "start", "apply", "sync", "resume", "check-security", "supersede", "cleanup") + update_operations + probe_operations + delegation_operations)
     parser.add_argument("root", type=Path, help="Selected project/source checkout")
     parser.add_argument("--client", action="append", choices=("app", "vscode"), default=[])
     parser.add_argument("--task-id", help="Include a read-only setup plan for a verified task worktree")
@@ -1556,6 +1770,14 @@ def main(argv: list[str] | None = None) -> int:
                           "delegation_policy.py" if args.operation in delegation_operations else "native_qualification.py")
                 handler = runpy.run_path(str(Path(__file__).resolve().parent / module))["handle"]
                 output = handler(args.operation, args.root, request, globals())
+            elif args.operation == "supersede":
+                output = supersede_task(args.root, request)
+            elif args.operation == "cleanup":
+                if not isinstance(request, dict) or set(request) != {"task_id", "usage"}:
+                    raise ValueError("Provide task_id and fresh usage")
+                binding = task_binding(args.root, request["task_id"])
+                output = cleanup_worktree({"task_id": binding["task_id"], "worktree": binding["worktree"],
+                                           "source": str(args.root), "usage": request["usage"]})
             elif args.operation == "start":
                 output = start_task(args.root, request)
             elif args.operation == "check-security":

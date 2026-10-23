@@ -81,10 +81,10 @@ class CleanupTests(PublicationFixture):
         self.assertNotEqual(self.cleanup()["status"], "ok")
         self.assertTrue(self.exists_remote())
 
-    def test_any_open_draft_closed_unmerged_missing_or_foreign_pr_prevents_deletion(self):
+    def test_any_open_draft_merged_missing_or_foreign_pr_prevents_deletion(self):
         original = copy.deepcopy(self.prs)
         variants = [dict(original[0], state="open", merged_at=None),
-                    dict(original[0], draft=True), dict(original[0], merged_at=None),
+                    dict(original[0], draft=True),
                     dict(original[0], body=original[0]["body"].replace(self.task["task_id"], str(uuid4())))]
         for pr in variants:
             with self.subTest(pr=pr):

@@ -46,7 +46,8 @@ and [recoverable recipe setup](onboarding.md) through `workflow.py`.
 The skill invokes it from the complete installed package. It previews compatible
 changes, applies the guard recipe and lifecycle policy in a verified worktree,
 and resumes interrupted writes without overwriting foreign edits. It also provides
-PR automation and ordered cleanup with a separate opt-out. Onboarding adds direct
+PR automation, `[SUPERSEDED]` predecessor closure and ordered cleanup with
+independent default-ON remote-branch and worktree options. Onboarding adds direct
 helper instructions to the existing project guide for normal tasks. The component
 installer API/CLI still installs only the subagent guard.
 
@@ -404,8 +405,9 @@ correct worktree, preservation and recovery decisions.
 In a disposable repository, verify skill discovery/read, helper `inspect`/`start`,
 actual commands and workers using the verified root, setup preview/apply/resume,
 and a no-change rerun. Exercise one planned synchronization, controlled publication
-failure and manual recovery. Qualify cleanup opt-out, complete merged-PR inventory,
-remote-first removal and interrupted recovery from outside the target. Use local
+failure and manual recovery. Qualify both independent cleanup opt-outs, complete
+terminal PR inventory, supersession closure, remote-first removal, native archive
+handoff and interrupted recovery from outside the target. Use local
 bare remotes and deterministic GitHub responses for destructive failure cases;
 label that evidence as transport fixtures, not real GitHub publication. A real
 phase PR can separately establish live publication evidence. Never create or merge

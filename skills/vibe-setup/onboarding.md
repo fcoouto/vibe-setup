@@ -35,7 +35,8 @@ preserved. Compatible agent settings and unrelated hook groups survive. Existing
 customized managed scripts/contracts and incompatible configuration require
 explicit reconciliation before any recipe file is written. Existing lifecycle
 opt-out is preserved; absent policy defaults to enabled. Cleanup defaults ON;
-`auto_cleanup=false` preserves resources after merge. Phase 3 provides explicit
+`delete_remote_branches=false` and `delete_worktrees=false` independently preserve
+resources; legacy `auto_cleanup=false` disables both actions. Phase 3 provides explicit
 [publication and cleanup](task-lifecycle.md) operations from the reviewed package.
 
 ## Decisions without needless questions
@@ -175,6 +176,8 @@ separate evidence; these filesystem tests do not qualify either client.
 
 The integrated skill uses the helper for PR synchronization and cleanup. The coordinator
 uses the established `[BLOCKED]`/`[READY]` rules and concrete manual delivery steps.
-Cleanup must confirm every associated PR merged, delete and verify remote branches
-first, then remove the local worktree. Setup itself performs none of those deletions;
+Supersession records a successor, applies `[SUPERSEDED]` and closes predecessor PRs.
+Cleanup must confirm every associated PR is closed or merged. It deletes eligible
+remote branches first, then removes the local worktree only after merge or recorded
+supersession, respecting both independent opt-outs. Setup performs none of those deletions;
 cleanup runs only through explicit lifecycle reconciliation.
