@@ -373,7 +373,8 @@ manual reconciliation; no broad sweep is authorized.
 
 For a native managed worktree, Python performs eligible remote cleanup and
 returns `native_action` naming `archive_worktree`, the exact worktree, task and
-head. The coordinator resolves that worktree's attachment in its owning chat,
+head, plus a `preflight` document/section reference. The coordinator follows the
+[native archive preflight](#native-archive-preflight) in that worktree's owning chat,
 uses the native archive tool, then invokes `cleanup` again from the source with
 fresh usage. A queued archive remains `cleanup=pending`; only absent filesystem
 path AND absent Git registration confirm removal. The helper never invokes a
@@ -388,6 +389,54 @@ A closed-unmerged task can therefore complete remote cleanup while retaining its
 worktree. A receipt with both resources removed remains historical evidence.
 Unexpected external disappearance without recorded removal intent stays pending.
 Recreated branches and changed inventories are never silently deleted again.
+
+### Native archive preflight
+
+Completed native subagents can retain inherited worktree attachments. The client
+may count those children as other owners, return `queued`, then restore the active
+attachment without removing the checkout. A completed report does not release an
+attachment. Resolve these owners before requesting archival; repeating the same
+request without changed evidence does not resolve retention.
+
+This is a coordinator procedure through supported native tools. Python cannot
+observe native child status or attachment ownership, and `native_action` is a
+handoff, not permission to skip these checks. Keep the native child IDs and their
+task/worktree bindings in the existing private task evidence when dispatching;
+do not create a separate registry or infer ownership from names or matching cwd.
+
+1. Confirm the helper's exact task, worktree and retained head, the owning chat's
+   attachment, and current cleanup authority. Use dispatch records and fresh native
+   agent/thread and attachment observations to identify only this task's children
+   that inherited this worktree. Check descendant activity and other ownership
+   before changing a child's archive state. Missing or conflicting identity,
+   attachment, pinning or ownership evidence leaves cleanup pending.
+2. A child is eligible only when its assigned work is complete, its final result
+   is collected, and fresh native status confirms no active turn or descendants.
+   Idle, waiting, interrupted, failed and unknown states alone do not establish
+   completion. Preserve running children, unfinished work, pinned/shared chats,
+   unrelated tasks and children needed by another active task. Never stop, cancel,
+   interrupt or change settings to make a child eligible. If any owner is unsafe
+   or unresolved, leave all child archive states unchanged and report the blocker.
+3. With the full inventory eligible, recheck each child immediately before using
+   `set_thread_archived` with its exact `threadId` and `archived=true`. Archive only
+   those completed task children, preserving their histories; leave the owning
+   chat open. Already archived children need no mutation. If status changes or a
+   tool fails, stop dependent archival, preserve completed actions and reconcile
+   the remaining owners. Native observations are not an atomic lock; do not resume
+   or reassign these retired children during cleanup.
+4. Refresh ownership/status evidence and rerun `cleanup` from the source with
+   fresh usage. Only a renewed `native_action` permits one `archive_worktree` call
+   for that exact attachment. If the path survives, inspect the archive outcome
+   and attachment owners; keep the result pending rather than looping or claiming
+   success. Run `cleanup` after removal to verify both filesystem and Git absence.
+
+If the client cannot expose sufficient ownership/status evidence or archive a
+completed child, retain the checkout and name the missing native action. Do not
+edit client databases, use private IPC, detach arbitrary attachments, archive the
+parent chat, or substitute Git/forced removal. This procedure does not expand a
+new task's authority over another chat's managed worktree. Unit tests cover the
+helper handoff; instruction scenarios and actual-client archival are separate
+evidence, not guarantees for every client/version.
 
 ### Deferred cleanup at the next task
 

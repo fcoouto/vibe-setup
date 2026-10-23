@@ -1855,10 +1855,11 @@ def _cleanup_worktree(state: dict, usage: dict) -> dict:
                 raise ValueError("Worktree cleanup opted out; preserve the worktree")
             if usage["kind"] == "managed":
                 cleanup["local"] = "archive_requested"
-                cleanup["last_error"] = "Archive this exact worktree through its native owner, then run cleanup again from the source"
+                cleanup["last_error"] = "Follow native_action.preflight for completed child attachments, archive through the native owner, then run cleanup from the source"
                 save_lifecycle(state)
                 return result("cleanup", "action_required", delivery, delivery=delivery, cleanup="pending", evidence_ref=str(path),
                               native_action={"tool": "archive_worktree", "worktree": str(root),
+                                             "preflight": str(Path(__file__).resolve().with_name("task-lifecycle.md")) + "#native-archive-preflight",
                                              "task_id": binding["task_id"], "head": heads[binding["branch"]]},
                               next_action=cleanup["last_error"])
             cleanup["local"] = "removing"

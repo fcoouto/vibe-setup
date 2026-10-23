@@ -533,6 +533,9 @@ Actual behavior still requires a real client fixture.
    and its actual diff/checks/report. Compare trusted child identity when available;
    otherwise retain the explicit unverified-binding risk. A structurally valid
    record or report is not evidence of successful work.
+   Retain the native child ID, parent/task binding and inherited worktree attachment
+   in existing private task evidence for later native cleanup; names and cwd alone
+   do not establish ownership.
 
 Use this required argument shape, replacing the example name and root together:
 
@@ -637,7 +640,10 @@ recorded supersession, checks ownership and heads, and applies independent defau
 refs before local removal when both actions are enabled; either option may be
 opted out independently. Closed-unmerged PRs retain their worktrees unless explicitly
 superseded. Local refs remain as the recovery copy. Native worktrees return an
-owner action; the coordinator performs that action and a bounded follow-up
+owner action; the coordinator first follows `native_action.preflight` in the installed
+helper's `task-lifecycle.md`. Only verified completed task children with inherited
+attachments may be archived; running, unfinished or uncertain children stay intact.
+The coordinator performs the owner action and a bounded follow-up
 `cleanup` verifies path and Git-registration absence. Queued archives stay pending.
 The worker must never substitute its own recursive deletion, force push, stale
 receipt or approval assertion.

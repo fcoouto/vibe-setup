@@ -58,6 +58,12 @@ Unsupported App-managed removals remain pending for their native owner. See
 [deferred cleanup](task-lifecycle.md#deferred-cleanup-at-the-next-task) for reuse,
 opt-out and legacy-record behavior.
 
+Managed archival includes a [native preflight](task-lifecycle.md#native-archive-preflight)
+for completed subagents that retain inherited attachments. The coordinator verifies
+task ownership and fresh completion before archiving those child chats, preserving
+their histories. Running or uncertain workers remain untouched; unavailable native
+ownership evidence keeps cleanup pending. The helper does not call native tools.
+
 For companion changes across repositories, [check overall completion](task-lifecycle.md#cross-repository-completion)
 against an explicit list of existing task bindings. This read-only check requires
 fresh merged-PR observations for every listed task and leaves per-repository

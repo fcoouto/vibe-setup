@@ -115,9 +115,33 @@ class RetirementTests(PublicationFixture):
         self.assertFalse(self.remote_exists())
         self.assertTrue(self.target.exists())
         self.assertEqual(result['native_action']['tool'], 'archive_worktree')
+        self.assertIn('preflight', result['native_action'])
+        document, section = result['native_action']['preflight'].rsplit('#', 1)
+        self.assertEqual(Path(document), Path(self.workflow.__file__).resolve().with_name('task-lifecycle.md'))
+        self.assertTrue(Path(document).is_file())
+        self.assertEqual(section, 'native-archive-preflight')
         self.assertEqual(self.record()['cleanup']['local'], 'archive_requested')
+        # A queued native action must not become a Python removal on retry.
+        self.assertEqual(self.cleanup()['cleanup'], 'pending')
+        self.assertTrue(self.target.exists())
         self.git(self.source, 'worktree', 'remove', str(self.target))
         self.assertEqual(self.cleanup()['cleanup'], 'complete')
+
+    def test_managed_handoff_preserves_running_unknown_shared_and_pinned_usage(self):
+        self.publish(merged=True)
+        for scope, writers in (
+            ('exclusive', [{'id': 'child', 'state': 'running'}]),
+            ('exclusive', [{'id': 'child', 'state': 'unknown'}]),
+            ('shared', []),
+            ('pinned', []),
+        ):
+            with self.subTest(scope=scope, writers=writers):
+                self.usage = {'kind': 'managed', 'scope': scope, 'writers': writers}
+                result = self.cleanup()
+                self.assertEqual(result['cleanup'], 'pending')
+                self.assertNotIn('native_action', result)
+                self.assertTrue(self.remote_exists())
+                self.assertTrue(self.target.exists())
 
     def test_pending_reason_is_durable_and_open_shared_pr_prevents_deletion(self):
         self.publish(merged=True)
